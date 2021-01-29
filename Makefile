@@ -1,8 +1,12 @@
 # Platform
 PLATFORM:=$(shell python -c "import sys; print(sys.platform)")
 
+# Path to the makefile and containing directory
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+current_dir := $(dir $(mkfile_path))
+
 # Anod search path
-ANOD_PATH:=$(HOME)/bootstrap
+ANOD_PATH:=$(current_dir)
 
 # Anod binary
 ANOD_BIN:=$(ANOD_PATH)/anod

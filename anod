@@ -1,0 +1,62 @@
+#! /bin/bash
+
+# Save the directory containing the script. We want to make sure we execute
+# most of our commands relative to this root, especially destructive commands
+# like deleting the sandbox.
+_bootstrap_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+
+# Activate the virtual environment
+source "${_bootstrap_path}"/.vpython/bin/activate
+
+
+# If the user sources this file, install anod as a shell function
+function anod {
+    case $1 in
+        build)
+            SHELL=/bin/bash python3 "${_bootstrap_path}"/support/libexec/anod.py build "${@:2}"
+            ;;
+
+        setenv)
+            eval "$( python3 "${_bootstrap_path}"/support/libexec/anod.py printenv "${@:2}" )"
+            ;;
+
+        reset)
+            rm -rf "${_bootstrap_path}"/support/sbx
+            echo "Deleted support/sbx"
+            ;;
+        
+        *)
+            python3 "${_bootstrap_path}"/support/libexec/anod.py $@
+            ;;
+    esac
+
+    return 0
+}
+
+
+# Determine if we're being sourced (BASH, KSH, and ZSH compliant):
+([[ -n $ZSH_EVAL_CONTEXT && $ZSH_EVAL_CONTEXT =~ :file$ ]] || 
+ [[ -n $KSH_VERSION && $(cd "$(dirname -- "$0")" &&
+    printf '%s' "${PWD%/}/")$(basename -- "$0") != "${.sh.file}" ]] || 
+ [[ -n $BASH_VERSION ]] && (return 0 2>/dev/null)) && sourced=1 || sourced=0
+
+# If we're not being sourced, then try to run the command the user requested.
+if [ $sourced -eq 0 ]; then
+    case $1 in
+        reset)
+            echo rm -rf "${_bootstrap_path}"/support/sbx
+            echo "Deleted support/sbx"
+            ;;
+
+        setenv)
+            echo "anod is not installed as a shell function."
+            echo "Try \`source anod\` and then run \`anod setenv $2\` again (without a leading \`./\`)."
+            exit 1
+            ;;
+
+        *)
+            python3 "${_bootstrap_path}"/support/libexec/anod.py $@
+            ;;
+    esac
+fi

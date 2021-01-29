@@ -43,6 +43,7 @@ We've organized this README into sections, to simplify navigation.
 5. [Running the Tests](#tests)
 6. [Building the Documentation](#docs)
 7. [Adding New Examples](#add-examples)
+8. [IDE Support](#ide-support)
 
 
 # 1. Quick Start<a name="quick-start" />
@@ -355,3 +356,8 @@ Each configuration file should be distinct, as it will specify the parameters pa
 You should also consider specifying the rundir when using multiple instance of OpenUxAS so that you can be sure to identify which output is associated with which instance.
 
 The example `03_Example_DistributedCooperation` illustrates the use of multiple OpenUxAS instances.
+
+# 8. IDE Support<a name="ide-support">
+
+Support for [Visual Studio Code](#https://code.visualstudio.com/) (VS Code) is provided through the [OpenUxAS-bootstrap](https://github.com/afrl-rq/OpenUxAS-bootstrap) repository via a special anod command that generates configuration files for building and nagivating OpenUxAS C and C++ source code.
+See [Section 5](https://github.com/afrl-rq/OpenUxAS-bootstrap#ides) of the OpenUxAS-bootstrap README for details.

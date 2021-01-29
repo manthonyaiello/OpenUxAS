@@ -34,10 +34,8 @@ examples/**/datawork/**
 
 # Visual Studio
 /.vs
+.vscode
 /regen-temp
-.vscode/c_cpp_properties.json
-.vscode/launch.json
-.vscode/settings.json
 
 # Ignore pyc files
 *.pyc

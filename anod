@@ -1,38 +1,17 @@
 #! /bin/bash
+#
+# Anod wrapper script.
 
-# Save the directory containing the script. We want to make sure we execute
-# most of our commands relative to this root, especially destructive commands
-# like deleting the sandbox.
-_bootstrap_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+# Script location
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Load global paths
+source "${SCRIPT_DIR}/infrastructure/paths.sh"
 
 # Activate the virtual environment
-source "${_bootstrap_path}"/.vpython/bin/activate
+source "${VPYTHON_ACTIVATE}"
 
-
-# If the user sources this file, install anod as a shell function
-function anod {
-    case $1 in
-        build)
-            SHELL=/bin/bash python3 "${_bootstrap_path}"/support/libexec/anod.py build "${@:2}"
-            ;;
-
-        setenv)
-            eval "$( python3 "${_bootstrap_path}"/support/libexec/anod.py printenv "${@:2}" )"
-            ;;
-
-        reset)
-            rm -rf "${_bootstrap_path}"/support/sbx
-            echo "Deleted support/sbx"
-            ;;
-        
-        *)
-            python3 "${_bootstrap_path}"/support/libexec/anod.py $@
-            ;;
-    esac
-
-    return 0
-}
+ANOD_SCRIPT="${INFRASTRUCTURE_DIR}/libexec/anod.py"
 
 
 # Determine if we're being sourced (BASH, KSH, and ZSH compliant):
@@ -45,18 +24,42 @@ function anod {
 if [ $sourced -eq 0 ]; then
     case $1 in
         reset)
-            echo rm -rf "${_bootstrap_path}"/support/sbx
-            echo "Deleted support/sbx"
+            rm -rf "${SBX_DIR}"
+            echo "Deleted \`${SBX_DIR}\`"
             ;;
 
         setenv)
             echo "anod is not installed as a shell function."
-            echo "Try \`source anod\` and then run \`anod setenv $2\` again (without a leading \`./\`)."
+            echo "Try \`source ./anod\` and then run \`anod setenv $2\` again (without a leading \`./\`)."
             exit 1
             ;;
 
         *)
-            python3 "${_bootstrap_path}"/support/libexec/anod.py $@
+            python3 "${ANOD_SCRIPT}" $@
             ;;
     esac
+else
+    # If the user sources this file, install anod as a shell function
+    function anod {
+        case $1 in
+            build)
+                SHELL=/bin/bash python3 "${ANOD_SCRIPT}" build "${@:2}"
+                ;;
+
+            setenv)
+                eval "$( python3 "${ANOD_SCRIPT}" printenv "${@:2}" )"
+                ;;
+
+            reset)
+                rm -rf "${SBX_DIR}"
+                echo "Deleted \`${SBX_DIR}\`"
+                ;;
+            
+            *)
+                python3 "${ANOD_SCRIPT}" $@
+                ;;
+        esac
+
+        return 0
+    }
 fi

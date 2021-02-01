@@ -6,7 +6,7 @@ build_open
 
 # Bootstrap Stuff
 # sandbox
-support/sbx
+infrastructure/sbx
 
 # python venv
 .vpython

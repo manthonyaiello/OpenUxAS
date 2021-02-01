@@ -1,12 +1,14 @@
 #! /bin/bash
+#
+# run-example wrapper script.
 
-# Save the directory containing the script. We want to make sure we execute
-# most of our commands relative to this root, especially destructive commands
-# like deleting the sandbox.
-_bootstrap_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+# Script location
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Load global paths
+source "${SCRIPT_DIR}/infrastructure/paths.sh"
 
 # Activate the virtual environment
-source "${_bootstrap_path}"/.vpython/bin/activate
+source "${VPYTHON_ACTIVATE}"
 
-python3 support/run-example.py $@
+python3 "${INFRASTRUCTURE_DIR}/run-example.py" $@

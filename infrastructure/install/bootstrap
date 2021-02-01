@@ -108,10 +108,10 @@ checkout "${GITHUB}/${BOOTSTRAP_FORK}" "${BOOTSTRAP_ROOT}"
 
 if [ -n "${ADA}" ]; then
   (cd "${BOOTSTRAP_ROOT}" && \
-   python3 support/install/install --automatic -v --log-file bootstrap.log ${ARGS})
+   python3 infrastructure/install/install --automatic -v --log-file bootstrap.log ${ARGS})
 else
   (cd "${BOOTSTRAP_ROOT}" && \
-   python3 support/install/install --automatic -v --log-file bootstrap.log --no-gnat ${ARGS})
+   python3 infrastructure/install/install --automatic -v --log-file bootstrap.log --no-gnat ${ARGS})
 fi
 
 if [ -n "${DEVEL}" ]; then

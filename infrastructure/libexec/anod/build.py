@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from e3.anod.sandbox import SandBox
 
 
-VCS_IGNORE_LIST += ["/support/sbx"]
+VCS_IGNORE_LIST += ["/infrastructure/sbx"]
 
 
 def add_anod_files_to_fingerprint(

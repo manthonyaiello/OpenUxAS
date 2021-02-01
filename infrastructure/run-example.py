@@ -23,15 +23,23 @@ if TYPE_CHECKING:
     from os import _Environ
 
 
-# OpenUxAS directory.
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                        ".."))
+# Path variables. The assumption is that these should be read from the
+# environment, but we provide fallbacks just in case.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OPENUXAS_ROOT = os.environ.get("OPENUXAS_ROOT",
+                               os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
 
-# Anod search path
-ANOD_PATH = ROOT_DIR
+ANOD_BIN = os.path.join(OPENUXAS_ROOT, "anod")
 
-# Anod binary
-ANOD_BIN = os.path.join(ANOD_PATH, "anod")
+EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR",
+                              os.path.join(OPENUXAS_ROOT, "examples"))
+
+LOCAL_LMCP_DIR = os.environ.get("LMCP_DIR",
+                                os.path.join(OPENUXAS_ROOT, "develop", "LmcpGen"))
+LOCAL_AMASE_DIR = os.environ.get("AMASE_DIR",
+                                 os.path.join(OPENUXAS_ROOT, "develop", "OpenAMASE"))
+LOCAL_UXAS_BIN = os.environ.get("UXAS_BIN",
+                                os.path.join(OPENUXAS_ROOT, "obj", "cpp", "uxas"))
 
 # Allow the environment specify how long we should wait after starting an
 # instance of OpenAMASE; default to 0 seconds.
@@ -191,13 +199,10 @@ def resolve_amase_dir(args: Namespace) -> str:
     if args.amase_dir:
         return args.amase_dir
 
-    local_amase_path = os.path.abspath(
-        os.path.join(ROOT_DIR, "..", "OpenAMASE")
-    )
-    if os.path.exists(local_amase_path):
-        build_dir = os.path.join(local_amase_path, "OpenAMASE", "build")
+    if os.path.exists(LOCAL_AMASE_DIR):
+        build_dir = os.path.join(LOCAL_AMASE_DIR, "OpenAMASE", "build")
         if os.path.exists(build_dir):
-            return local_amase_path
+            return LOCAL_AMASE_DIR
         else:
             logging.warning(UNBUILT_LOCAL_AMASE)
 
@@ -222,7 +227,7 @@ def resolve_uxas_bin(args: Namespace) -> str:
     """
     Resolve the OpenUxAS binary.
 
-    1. if we've been given an absolute path in the arguments, use that.
+    1. if we've been given a path in the arguments, use that.
     2. see if there's a local uxas that's been built and use that.
     3. see if uxas is on the path.
 
@@ -231,9 +236,8 @@ def resolve_uxas_bin(args: Namespace) -> str:
     if args.uxas_bin:
         return args.uxas_bin
 
-    local_uxas_path = os.path.join(ROOT_DIR, "obj", "cpp", "uxas")
-    if os.path.exists(local_uxas_path):
-        return local_uxas_path
+    if os.path.exists(LOCAL_UXAS_BIN):
+        return LOCAL_UXAS_BIN
 
     uxas_path = shutil.which("uxas")
 
@@ -574,7 +578,7 @@ if __name__ == "__main__":
 
     ap.add_argument(
         "--uxas-dir",
-        default=ROOT_DIR,
+        default=OPENUXAS_ROOT,
         help="absolute path to the OpenUxAS repository "
         "containing build outputs",
     )
@@ -643,7 +647,7 @@ if __name__ == "__main__":
         if os.path.isabs(args.example):
             example_dir = args.example
         else:
-            example_dir = os.path.join(ROOT_DIR, args.example)
+            example_dir = os.path.join(EXAMPLES_DIR, args.example)
 
         logging.info("Running example in\n" f"           {example_dir}")
 
@@ -662,7 +666,7 @@ if __name__ == "__main__":
         if not os.path.exists(yaml_filename):
             logging.critical(
                 f"Example '{args.example}' is not property configured.\n"
-                f"           There is no '{CONFIG_FILE}' in the example directory.\n"
+                f"        There is no '{CONFIG_FILE}' in the example directory.\n"
                 "        Use the `--list` option for a list of available examples."
             )
             exit(1)

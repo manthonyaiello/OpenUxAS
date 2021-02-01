@@ -14,7 +14,7 @@ REPO_DIR = os.path.realpath(
 
 SUPPORT_DIR = os.path.join(
     REPO_DIR,
-    "support",
+    "infrastructure",
 )
 
 SPEC_DIR = os.path.join(

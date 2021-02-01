@@ -1,7 +1,7 @@
 from e3.anod.package import UnmanagedSourceBuilder
 from e3.anod.spec import Anod
 import os
-from e3.fs import sync_tree, mkdir, rm, VCS_IGNORE_LIST
+from e3.fs import sync_tree, mkdir, rm
 from e3.os.fs import unixpath
 
 

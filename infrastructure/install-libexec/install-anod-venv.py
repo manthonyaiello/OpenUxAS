@@ -27,18 +27,16 @@ from support.arguments import (
     add_apt_group,
     add_force_argument,
     add_dry_run_argument,
-    add_print_env_argument,
 )
 from support.commands import Command, run_command_and_exit_on_fail
 from support.log import configure_logging, log_wrap
+from support.paths import INFRASTRUCTURE_UXAS, VPYTHON_DIR
 
 
-# Directory in which this script is executing.
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CWD = os.getcwd()
-SOFTWARE_DIR = os.path.join(CWD, "software")
-
-APT_UPDATE = Command(cmd=["sudo", "apt", "update"], description="Updating apt",)
+APT_UPDATE = Command(
+    cmd=["sudo", "apt", "update"],
+    description="Updating apt",
+)
 
 APT_INSTALL = Command(
     cmd=[
@@ -59,10 +57,9 @@ APT_INSTALL = Command(
     description="Installing dependencies",
 )
 
-VENV_DIR = os.path.join(CWD, ".vpython")
-VENV_PIP = os.path.join(VENV_DIR, "bin", "pip")
+VENV_PIP = os.path.join(VPYTHON_DIR, "bin", "pip")
 VENV_INSTALL = Command(
-    cmd=[sys.executable, "-m", "venv", "--clear", VENV_DIR],
+    cmd=[sys.executable, "-m", "venv", "--clear", VPYTHON_DIR],
     description="Create python virtual environment",
 )
 
@@ -76,34 +73,21 @@ WHEEL_INSTALL = Command(
     description="Installing wheel in the virtual environment",
 )
 
-E3_INSTALL = Command(
-    cmd=[VENV_PIP, "install", "e3-core", "e3-testsuite"],
-    description="Installing e3-core and e3-testsuite in the virtual environment",
-)
-
-ZMQ_INSTALL = Command(
-    cmd=[VENV_PIP, "install", "pyzmq"],
-    description="Install pyzmq in the virtual environment",
-)
-
-
-ENV_COMMANDS = f"""\
-PATH={os.path.join(VENV_DIR, 'bin')}:$PATH\
-"""
+UXAS_INSTALL = Command(cmd=[VENV_PIP, "install", INFRASTRUCTURE_UXAS])
 
 DESCRIPTION = """\
 This script automates the installation of the anod virtual environment, which
-is required to build OpenUxAS using anod. You should generally run this script
-from the root of bootstrap, like this:
+is required to build OpenUxAS using anod. You should run this script like this:
 
-    `python3 util/install-anod-venv`
+    OpenUxAS$ infrastructure/install
 """
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    argument_parser = ArgumentParser(description=DESCRIPTION,)
-    add_print_env_argument(argument_parser)
+    argument_parser = ArgumentParser(
+        description=DESCRIPTION,
+    )
     add_dry_run_argument(argument_parser)
     add_force_argument(argument_parser)
 
@@ -117,18 +101,14 @@ if __name__ == "__main__":
 
     configure_logging(args)
 
-    if args.printenv:
-        print(ENV_COMMANDS)
-        exit(0)
-
     skip_install_venv = False
 
-    if os.path.exists(VENV_DIR):
+    if os.path.exists(VPYTHON_DIR):
         if args.force:
             if args.dry_run:
-                print(f"rm -rf {VENV_DIR}")
+                print(f"rm -rf {VPYTHON_DIR}")
             else:
-                shutil.rmtree(VENV_DIR)
+                shutil.rmtree(VPYTHON_DIR)
         else:
             logging.warning(
                 log_wrap(
@@ -163,5 +143,4 @@ if __name__ == "__main__":
     run_command_and_exit_on_fail(VENV_INSTALL, args.dry_run)
     run_command_and_exit_on_fail(PIP_UPDATE, args.dry_run)
     run_command_and_exit_on_fail(WHEEL_INSTALL, args.dry_run)
-    run_command_and_exit_on_fail(E3_INSTALL, args.dry_run)
-    run_command_and_exit_on_fail(ZMQ_INSTALL, args.dry_run)
+    run_command_and_exit_on_fail(UXAS_INSTALL, args.dry_run)

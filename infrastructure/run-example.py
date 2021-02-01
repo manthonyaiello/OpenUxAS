@@ -17,29 +17,13 @@ import traceback
 from typing import TYPE_CHECKING
 import yaml
 
+from uxas.paths import OPENUXAS_ROOT, EXAMPLES_DIR, ANOD_BIN, AMASE_DIR, UXAS_BIN
+
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace
     from typing import Any, Dict, List, Optional, Tuple
     from os import _Environ
 
-
-# Path variables. The assumption is that these should be read from the
-# environment, but we provide fallbacks just in case.
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OPENUXAS_ROOT = os.environ.get("OPENUXAS_ROOT",
-                               os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
-
-ANOD_BIN = os.path.join(OPENUXAS_ROOT, "anod")
-
-EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR",
-                              os.path.join(OPENUXAS_ROOT, "examples"))
-
-LOCAL_LMCP_DIR = os.environ.get("LMCP_DIR",
-                                os.path.join(OPENUXAS_ROOT, "develop", "LmcpGen"))
-LOCAL_AMASE_DIR = os.environ.get("AMASE_DIR",
-                                 os.path.join(OPENUXAS_ROOT, "develop", "OpenAMASE"))
-LOCAL_UXAS_BIN = os.environ.get("UXAS_BIN",
-                                os.path.join(OPENUXAS_ROOT, "obj", "cpp", "uxas"))
 
 # Allow the environment specify how long we should wait after starting an
 # instance of OpenAMASE; default to 0 seconds.
@@ -199,10 +183,10 @@ def resolve_amase_dir(args: Namespace) -> str:
     if args.amase_dir:
         return args.amase_dir
 
-    if os.path.exists(LOCAL_AMASE_DIR):
-        build_dir = os.path.join(LOCAL_AMASE_DIR, "OpenAMASE", "build")
+    if os.path.exists(AMASE_DIR):
+        build_dir = os.path.join(AMASE_DIR, "OpenAMASE", "build")
         if os.path.exists(build_dir):
-            return LOCAL_AMASE_DIR
+            return AMASE_DIR
         else:
             logging.warning(UNBUILT_LOCAL_AMASE)
 
@@ -236,8 +220,8 @@ def resolve_uxas_bin(args: Namespace) -> str:
     if args.uxas_bin:
         return args.uxas_bin
 
-    if os.path.exists(LOCAL_UXAS_BIN):
-        return LOCAL_UXAS_BIN
+    if os.path.exists(UXAS_BIN):
+        return UXAS_BIN
 
     uxas_path = shutil.which("uxas")
 

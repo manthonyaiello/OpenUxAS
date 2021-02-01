@@ -1,7 +1,7 @@
 amase:
-  revision: None
-  url: /home/tony/OpenUxAS/develop/OpenAMASE
-  vcs: external
+  vcs: git
+  url: https://github.com/afrl-rq/OpenAMASE.git
+  revision: master
 cppzmq:
   revision: v4.2.2
   url: https://github.com/zeromq/cppzmq.git
@@ -15,9 +15,9 @@ libzmq:
   url: https://github.com/zeromq/libzmq.git
   vcs: git
 lmcpgen:
-  revision: None
-  url: /home/tony/OpenUxAS/develop/LmcpGen
-  vcs: external
+  vcs: git
+  url: https://github.com/afrl-rq/LmcpGen.git
+  revision: develop
 openuxas:
   revision: None
   url: .

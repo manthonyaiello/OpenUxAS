@@ -16,11 +16,8 @@
 #   USE_GIT_URI    : if set (to anything other than the empty string), do not
 #                    perform the checkout using https.
 #
-#   ADA            : if set (to anything other than the empty string), install
-#                    GNAT Community Edition, to enable Ada development.
-#
 #   DEVEL          : if set (to anything other than the empty string),
-#                    configure uxas, lmcp and amase for development.
+#                    configure lmcp and amase for development.
 
 ARGS=$@
 
@@ -94,7 +91,7 @@ failed_checkout() {
 }
 
 checkout() {
-  [ -d "$2" ] || git clone --depth 1 "$1" "$2" || failed_checkout "$1"
+  [ -d "$2" ] || git clone "$1" "$2" || failed_checkout "$1"
 }
 
 
@@ -106,15 +103,9 @@ fi
 
 checkout "${GITHUB}/${BOOTSTRAP_FORK}" "${BOOTSTRAP_ROOT}"
 
-if [ -n "${ADA}" ]; then
-  (cd "${BOOTSTRAP_ROOT}" && \
-   python3 infrastructure/install/install --automatic -v --log-file bootstrap.log ${ARGS})
-else
-  (cd "${BOOTSTRAP_ROOT}" && \
-   python3 infrastructure/install/install --automatic -v --log-file bootstrap.log --no-gnat ${ARGS})
-fi
+( cd "${BOOTSTRAP_ROOT}" && infrastructure/install )
 
 if [ -n "${DEVEL}" ]; then
-  (cd "${BOOTSTRAP_ROOT}" && \
-   ./anod devel-setup lmcp amase --log-file devel-setup.log)
+  ( cd "${BOOTSTRAP_ROOT}" && \
+    ./anod devel-setup lmcp amase --log-file devel-setup.log )
 fi

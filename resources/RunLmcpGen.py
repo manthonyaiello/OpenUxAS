@@ -12,6 +12,16 @@ import sys
 
 from typing import TYPE_CHECKING
 
+from uxas.paths import (
+    OPENUXAS_ROOT,
+    ANOD_BIN,
+    MDMS_DIR,
+    LMCP_DIR,
+    AMASE_DIR,
+    CPP_DIR,
+    DOC_DIR,
+)
+
 if TYPE_CHECKING:
     from argparse import Namespace
     from typing import List
@@ -26,18 +36,6 @@ MDMs in the OpenUxAS repository.
 # Path variables. The assumption is that these should be read from the
 # environment, but we provide fallbacks just in case.
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OPENUXAS_ROOT = os.environ.get("OPENUXAS_ROOT",
-                               os.path.abspath(os.path.join(SCRIPT_DIR, "..")))
-
-ANOD_BIN = os.path.join(OPENUXAS_ROOT, "anod")
-
-MDMS_DIR = os.environ.get("MDMS_DIR",
-                          os.path.join(OPENUXAS_ROOT, "mdms"))
-
-LMCP_DIR = os.environ.get("LMCP_DIR",
-                          os.path.join(OPENUXAS_ROOT, "develop", "LmcpGen"))
-AMASE_DIR = os.environ.get("AMASE_DIR",
-                           os.path.join(OPENUXAS_ROOT, "develop", "OpenAMASE"))
 
 AMASE_LMCP_DIR = os.path.join(AMASE_DIR, "OpenAMASE", "lib", "LMCP")
 
@@ -46,15 +44,11 @@ ANT_CMD = ["ant", "-q", "jar"]
 LMCP_JAR = os.path.join(LMCP_DIR, "dist", "LmcpGen.jar")
 LMCP_CMD = ["java", "-Xmx2048m", "-jar", LMCP_JAR, "-mdmdir", MDMS_DIR]
 
-CPP_DIR = os.environ.get("CPP_DIR",
-                         os.path.join(OPENUXAS_ROOT, "src", "cpp"))
 SRC_CPP_LMCP = os.path.join(CPP_DIR, "LMCP")
 
-DOC_DIR = os.environ.get("DOC_DIR",
-                         os.path.join(OPENUXAS_ROOT, "doc"))
 DOC_LMCP = os.path.join(DOC_DIR, "LMCP")
 
-PY_LMCP = os.path.join(OPENUXAS_ROOT, "src", "cpp", "LMCP", "py")
+PY_LMCP = os.path.join(SRC_CPP_LMCP, "py")
 
 # For log consistency with our other usages.
 STREAM_FMT = "%(levelname)-8s %(message)s"

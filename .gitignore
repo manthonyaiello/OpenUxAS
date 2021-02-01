@@ -53,6 +53,8 @@ examples/**/datawork/**
 *.pyc
 __pycache__
 .mypy_cache
+.coverage
+.tox
 
 # Ignore build directories
 /prerequisites/sbx

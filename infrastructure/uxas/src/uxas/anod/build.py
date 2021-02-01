@@ -17,7 +17,7 @@ from e3.net.http import HTTPSession
 from e3.anod.status import ReturnValue
 from e3.archive import unpack_archive
 from e3.fingerprint import Fingerprint
-from e3.fs import mkdir, sync_tree, rm, cp, VCS_IGNORE_LIST
+from e3.fs import mkdir, sync_tree, rm, cp  # , VCS_IGNORE_LIST
 from e3.os.fs import cd
 
 import json
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from e3.anod.sandbox import SandBox
 
 
-VCS_IGNORE_LIST += ["/infrastructure/sbx"]
+# VCS_IGNORE_LIST += ["/infrastructure/sbx"]
 
 
 def add_anod_files_to_fingerprint(

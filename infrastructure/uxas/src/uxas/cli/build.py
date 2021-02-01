@@ -4,20 +4,14 @@
 
 from __future__ import annotations
 
-from anod.build import UxasBuilder
-from anod.util import check_common_tools, create_anod_context, create_anod_sandbox
-from anod.paths import REPO_DIR, SPEC_DIR, SBX_DIR
+from uxas.anod.build import UxasBuilder
+from uxas.anod.util import check_common_tools, create_anod_context, create_anod_sandbox
+from uxas.paths import SPEC_DIR, SBX_DIR
 
 from e3.anod.status import ReturnValue
 from e3.env import BaseEnv
 from e3.main import Main
 
-import os
-
-
-# Uxas repo root directory
-OPENUXAS_ROOT_DIR = os.path.dirname(REPO_DIR)
-os.environ["OPENUXAS_ROOT_DIR"] = OPENUXAS_ROOT_DIR
 
 # Define what we mean by a successful build.
 BUILD_SUCCESS = [
@@ -29,7 +23,7 @@ BUILD_SUCCESS = [
 
 
 def do_build(m: Main, set_prog: bool = True) -> int:
-    """Perform the build."""
+    """Gather options so that we can perform the build."""
     if set_prog:
         m.argument_parser.prog = m.argument_parser.prog + " build"
     m.argument_parser.add_argument(

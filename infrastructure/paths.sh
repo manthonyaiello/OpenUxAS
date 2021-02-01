@@ -7,31 +7,36 @@
 # a source, we need to be careful about how we compute the path. Note no
 # support for KSH at present.
 if [[ -n $ZSH_EVAL_CONTEXT ]]; then
-    OPENUXAS_ROOT="$( cd "${0:a:h}/.." && pwd )"
+    export OPENUXAS_ROOT="$( cd "${0:a:h}/.." && pwd )"
 else
-    OPENUXAS_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/.. >/dev/null 2>&1 && pwd )"
+    export OPENUXAS_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/.. >/dev/null 2>&1 && pwd )"
 fi
 
-DOC_DIR="${OPENUXAS_ROOT}/doc"
-EXAMPLES_DIR="${OPENUXAS_ROOT}/examples"
-INFRASTRUCTURE_DIR="${OPENUXAS_ROOT}/infrastructure"
-MDMS_DIR="${OPENUXAS_ROOT}/mdms"
-OBJ_DIR="${OPENUXAS_ROOT}/obj"
-RESOURCES_DIR="${OPENUXAS_ROOT}/resources"
-SRC_DIR="${OPENUXAS_ROOT}/src"
-TESTS_DIR="${OPENUXAS_ROOT}/tests"
+export ANOD_BIN="${OPENUXAS_ROOT}/anod"
 
-CPP_DIR="${SRC_DIR}/cpp"
-ADA_DIR="${SRC_DIR}/ada"
+export DOC_DIR="${OPENUXAS_ROOT}/doc"
+export EXAMPLES_DIR="${OPENUXAS_ROOT}/examples"
+export INFRASTRUCTURE_DIR="${OPENUXAS_ROOT}/infrastructure"
+export MDMS_DIR="${OPENUXAS_ROOT}/mdms"
+export OBJ_DIR="${OPENUXAS_ROOT}/obj"
+export RESOURCES_DIR="${OPENUXAS_ROOT}/resources"
+export SRC_DIR="${OPENUXAS_ROOT}/src"
+export TESTS_DIR="${OPENUXAS_ROOT}/tests"
 
-UXAS_BIN="${OBJ_DIR}/cpp/uxas"
+export CPP_DIR="${SRC_DIR}/cpp"
+export ADA_DIR="${SRC_DIR}/ada"
+
+export UXAS_BIN="${OBJ_DIR}/cpp/uxas"
 
 # For LmcpGen and OpenAMASE
-SUPPORT_DIR="${OPENUXAS_ROOT}/develop"
-LMCP_DIR="${SUPPORT_DIR}/LmcpGen"
-AMASE_DIR="${SUPPORT_DIR}/OpenAMASE"
+export SUPPORT_DIR="${OPENUXAS_ROOT}/develop"
+export LMCP_DIR="${SUPPORT_DIR}/LmcpGen"
+export AMASE_DIR="${SUPPORT_DIR}/OpenAMASE"
 
-VPYTHON_DIR="${OPENUXAS_ROOT}/.vpython"
-VPYTHON_ACTIVATE="${VPYTHON_DIR}/bin/activate"
+export VPYTHON_DIR="${OPENUXAS_ROOT}/.vpython"
+export VPYTHON_ACTIVATE="${VPYTHON_DIR}/bin/activate"
 
-SBX_DIR="${INFRASTRUCTURE_DIR}/sbx"
+export INSTALL_LIBEXEC_DIR="${INFRASTRUCTURE_DIR}/install-libexec"
+
+export SPEC_DIR="${INFRASTRUCTURE_DIR}/specs"
+export SBX_DIR="${INFRASTRUCTURE_DIR}/sbx"

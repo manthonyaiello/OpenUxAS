@@ -39,7 +39,10 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 CWD = os.getcwd()
 SOFTWARE_DIR = os.path.join(CWD, "software")
 
-APT_UPDATE = Command(cmd=["sudo", "apt", "update"], description="Updating apt",)
+APT_UPDATE = Command(
+    cmd=["sudo", "apt", "update"],
+    description="Updating apt",
+)
 
 APT_INSTALL = Command(
     cmd=[
@@ -109,7 +112,9 @@ run this script from the root of bootstrap, like this:
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    argument_parser = ArgumentParser(description=DESCRIPTION,)
+    argument_parser = ArgumentParser(
+        description=DESCRIPTION,
+    )
 
     add_print_env_argument(argument_parser)
     add_dry_run_argument(argument_parser)

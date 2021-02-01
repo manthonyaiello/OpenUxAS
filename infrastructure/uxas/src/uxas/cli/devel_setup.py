@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from anod.paths import REPO_DIR, SPEC_DIR
+from uxas.paths import OPENUXAS_ROOT, SPEC_DIR
 
 from e3.main import Main
 
@@ -22,7 +22,7 @@ CONFIG_DIR_NAME = "config"
 REPOSITORIES_FILENAME = "repositories.yaml"
 REPOSITORIES_YAML_PATH = os.path.join(SPEC_DIR, CONFIG_DIR_NAME, REPOSITORIES_FILENAME)
 
-DEFAULT_REPO_DIR = os.path.join(REPO_DIR, "develop")
+DEFAULT_REPO_DIR = os.path.join(OPENUXAS_ROOT, "develop")
 
 DEFAULT_LMCP_DIR = os.path.join(DEFAULT_REPO_DIR, "LmcpGen")
 LMCP_YAML_KEY = "lmcpgen"

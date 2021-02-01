@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-
 """Simple front-end to the task-specific anod scripts contained in lib."""
-
 from e3.main import Main
 
 from argparse import SUPPRESS, ArgumentParser, _HelpAction
@@ -20,6 +17,7 @@ class CustomHelpAction(_HelpAction):
     """
 
     def __init__(self, option_strings, dest=SUPPRESS, default=SUPPRESS, help=None):
+        """Construct and instance."""
         super(CustomHelpAction, self).__init__(
             option_strings=option_strings,
             dest=dest,
@@ -35,6 +33,7 @@ class CustomHelpAction(_HelpAction):
         values,
         option_string=None,
     ):
+        """Override action call."""
         if self.current_pass > 1 or getattr(namespace, "command", None) is None:
             parser.print_help()
             parser.exit()
@@ -44,8 +43,11 @@ class CustomHelpAction(_HelpAction):
         self.current_pass += 1
 
 
-if __name__ == "__main__":
-    m = Main(argument_parser=ArgumentParser(add_help=False))
+def do_cli() -> int:
+    """Run the anod cli."""
+    m = Main(argument_parser=ArgumentParser(add_help=False), name="anod")
+
+    m.argument_parser.prog = "anod"
 
     command_arg = m.argument_parser.add_argument(
         "command",
@@ -68,20 +70,24 @@ if __name__ == "__main__":
     help_arg.increment_pass()
 
     if m.args.command == "build":
-        from anod_build import do_build
+        from uxas.cli.build import do_build
 
-        exit(do_build(m))
+        return do_build(m)
 
     elif m.args.command == "printenv":
-        from anod_printenv import do_printenv
+        from uxas.cli.printenv import do_printenv
 
-        exit(do_printenv(m))
+        return do_printenv(m)
 
     elif m.args.command == "devel-setup":
-        from anod_devel_setup import do_devel_setup
+        from uxas.cli.devel_setup import do_devel_setup
 
-        exit(do_devel_setup(m))
+        return do_devel_setup(m)
 
     else:
         # cannot happen
-        exit(4)
+        return 4
+
+
+if __name__ == "__main__":
+    exit(do_cli())

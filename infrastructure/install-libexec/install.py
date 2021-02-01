@@ -29,24 +29,22 @@ from support.arguments import (
 )
 from support.commands import Command, run_command_and_exit_on_fail
 from support.log import configure_logging, wrap
+from support.paths import INSTALL_LIBEXEC_DIR
 
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CWD = os.getcwd()
 
 GNAT_INSTALL = Command(
-    cmd=[sys.executable, os.path.join(ROOT_DIR, "install-gnat")],
+    cmd=[sys.executable, os.path.join(INSTALL_LIBEXEC_DIR, "install-gnat.py")],
     description="Install gnat",
 )
 
-GNAT_ENV = Command(cmd=GNAT_INSTALL.cmd + ["--printenv"],)
-
-VENV_INSTALL = Command(
-    cmd=[sys.executable, os.path.join(ROOT_DIR, "install-anod-venv")],
-    description="Install anod venv",
+GNAT_ENV = Command(
+    cmd=GNAT_INSTALL.cmd + ["--printenv"],
 )
 
-VENV_ENV = Command(cmd=VENV_INSTALL.cmd + ["--printenv"],)
+VENV_INSTALL = Command(
+    cmd=[sys.executable, os.path.join(INSTALL_LIBEXEC_DIR, "install-anod-venv.py")],
+    description="Install anod venv",
+)
 
 
 def pass_args(command: Command) -> Command:
@@ -66,7 +64,9 @@ of bootstra, like this:
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    argument_parser = ArgumentParser(description=DESCRIPTION,)
+    argument_parser = ArgumentParser(
+        description=DESCRIPTION,
+    )
 
     add_dry_run_argument(argument_parser)
     add_force_argument(argument_parser)
@@ -119,17 +119,23 @@ if __name__ == "__main__":
     installed_gnat = False
     installed_venv = False
 
-    if args.install_gnat and (
-        not args.interactive or input("Install GNAT community? [Y/n] ") != "n"
-    ):
-        command = pass_args(GNAT_INSTALL)
+    # Temporarily disable installing GNAT CE - need to think about paths
+    #
+    # if args.install_gnat and (
+    #     not args.interactive
+    #     or input(
+    #         "Install GNAT community (optional; needed to build Ada services)? [Y/n] "
+    #     )
+    #     != "n"
+    # ):
+    #     command = pass_args(GNAT_INSTALL)
 
-        if set_no_update:
-            command.cmd.append("--no-update")
+    #     if set_no_update:
+    #         command.cmd.append("--no-update")
 
-        run_command_and_exit_on_fail(command)
-        set_no_update = True
-        installed_gnat = True
+    #     run_command_and_exit_on_fail(command)
+    #     set_no_update = True
+    #     installed_gnat = True
 
     if (
         args.interactive and input("Install anod virtual environment? [Y/n] ") != "n"
@@ -143,16 +149,11 @@ if __name__ == "__main__":
         set_no_update = True
         installed_venv = True
 
-    if installed_gnat or installed_venv:
+    if installed_gnat:
         env_commands = str()
 
-        if installed_gnat:
-            result = subprocess.run(GNAT_ENV.cmd, stdout=subprocess.PIPE)
-            env_commands += " " * 4 + result.stdout.decode(sys.stdout.encoding)
-
-        if installed_venv:
-            result = subprocess.run(VENV_ENV.cmd, stdout=subprocess.PIPE)
-            env_commands += " " * 4 + result.stdout.decode(sys.stdout.encoding)
+        result = subprocess.run(GNAT_ENV.cmd, stdout=subprocess.PIPE)
+        env_commands += " " * 4 + result.stdout.decode(sys.stdout.encoding)
 
         print(" ")
         print(
@@ -165,15 +166,4 @@ if __name__ == "__main__":
         )
         print(" ")
         print(env_commands)
-        print(
-            wrap(
-                """\
-                To make working with anod's output more comfortable, you should
-                consider also adding the following to your profile:
-                """
-            )
-        )
-        print(" ")
-        print('    eval "$( python3 %s/anod printenv uxas )"' % CWD)
-        print('    eval "$( python3 %s/anod printenv amase )"' % CWD)
         print(" ")

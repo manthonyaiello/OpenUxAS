@@ -5,17 +5,20 @@ PLATFORM:=$(shell python -c "import sys; print(sys.platform)")
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(dir $(mkfile_path))
 
-# Anod search path
-ANOD_PATH:=$(current_dir)
+# Don't autoconfigure the build environment if this Makefile is invoked by anod
+ifneq ($(SKIP_ANOD_SETUP),true)
+	# Anod search path
+	ANOD_PATH:=$(current_dir)
 
-# Anod binary
-ANOD_BIN:=$(ANOD_PATH)/anod
+	# Anod binary
+	ANOD_BIN:=$(ANOD_PATH)/anod
 
-# Check if anod is available and export the uxas build environment if so
-ifneq (,$(wildcard $(ANOD_BIN)))
-    ANODENV:=$(shell $(ANOD_BIN) printenv uxas --build-env --inline)
-else
-    ANODENV:=
+	# Check if anod is available and export the uxas build environment if so
+	ifneq (,$(wildcard $(ANOD_BIN)))
+		ANODENV:=$(shell $(ANOD_BIN) --no-install printenv uxas --build-env --inline)
+	else
+		ANODENV:=
+	endif
 endif
 
 # Control whether full command line should be displayed during compilation

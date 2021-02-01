@@ -1,6 +1,11 @@
-#! /bin/bash
+#! /usr/bin/env bash
 #
 # Anod wrapper script.
+#
+# Note that this script is meant to either be run directly by the user or is
+# meant to be sourced. In the former case, we can assume we're running bash. In
+# the latter case, we're in the user's current shell. We support bash and zsh.
+# Support for ksh is incomplete.
 
 # Script location
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -8,17 +13,43 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Load global paths
 source "${SCRIPT_DIR}/infrastructure/paths.sh"
 
-# Activate the virtual environment
-source "${VPYTHON_ACTIVATE}"
-
-ANOD_SCRIPT="${INFRASTRUCTURE_DIR}/libexec/anod.py"
-
 
 # Determine if we're being sourced (BASH, KSH, and ZSH compliant):
 ([[ -n $ZSH_EVAL_CONTEXT && $ZSH_EVAL_CONTEXT =~ :file$ ]] || 
  [[ -n $KSH_VERSION && $(cd "$(dirname -- "$0")" &&
     printf '%s' "${PWD%/}/")$(basename -- "$0") != "${.sh.file}" ]] || 
  [[ -n $BASH_VERSION ]] && (return 0 2>/dev/null)) && sourced=1 || sourced=0
+
+
+if [ -f ${VPYTHON_ACTIVATE} ]; then
+    # Activate the virtual environment
+    source "${VPYTHON_ACTIVATE}"
+else
+    # This is here so that make doesn't halt with no visible output while
+    # anod tries to install itself.
+    if [[ $1 == "--no-install" ]]; then
+        exit 1
+    fi
+
+    echo "It looks like this is your first time running anod for this OpenUxAS clone."
+    echo "Let's install the infrastructure support on which anod depends."
+    echo " "
+
+    ${INFRASTRUCTURE_DIR}/install
+
+    if [ -f ${VPYTHON_ACTIVATE} ]; then
+        source "${VPYTHON_ACTIVATE}"
+    else
+        echo "Installing infrastructure support appears to have failed."
+        
+        if [ $source -eq 0 ]; then
+            exit 1
+        fi
+    fi
+fi
+
+
+ANOD_SCRIPT="from uxas.cli.anod import do_cli; exit(do_cli())"
 
 # If we're not being sourced, then try to run the command the user requested.
 if [ $sourced -eq 0 ]; then
@@ -35,7 +66,7 @@ if [ $sourced -eq 0 ]; then
             ;;
 
         *)
-            python3 "${ANOD_SCRIPT}" $@
+            SHELL=/bin/bash python3 -c "${ANOD_SCRIPT}" $@
             ;;
     esac
 else
@@ -43,11 +74,11 @@ else
     function anod {
         case $1 in
             build)
-                SHELL=/bin/bash python3 "${ANOD_SCRIPT}" build "${@:2}"
+                SHELL=/bin/bash python3 -c "${ANOD_SCRIPT}" build "${@:2}"
                 ;;
 
             setenv)
-                eval "$( python3 "${ANOD_SCRIPT}" printenv "${@:2}" )"
+                eval "$( python3 -c "${ANOD_SCRIPT}" printenv "${@:2}" )"
                 ;;
 
             reset)
@@ -56,7 +87,8 @@ else
                 ;;
             
             *)
-                python3 "${ANOD_SCRIPT}" $@
+                echo $OPENUXAS_ROOT
+                python3 -c "${ANOD_SCRIPT}" $@
                 ;;
         esac
 

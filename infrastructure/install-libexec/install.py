@@ -18,7 +18,6 @@ To get more information and to control the script's behavior, run:
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 
 from support.arguments import (
@@ -28,7 +27,7 @@ from support.arguments import (
     add_dry_run_argument,
 )
 from support.commands import Command, run_command_and_exit_on_fail
-from support.log import configure_logging, wrap
+from support.log import configure_logging
 from support.paths import INSTALL_LIBEXEC_DIR
 
 
@@ -119,27 +118,25 @@ if __name__ == "__main__":
     installed_gnat = False
     installed_venv = False
 
-    # Temporarily disable installing GNAT CE - need to think about paths
-    #
-    # if args.install_gnat and (
-    #     not args.interactive
-    #     or input(
-    #         "Install GNAT community (optional; needed to build Ada services)? [Y/n] "
-    #     )
-    #     != "n"
-    # ):
-    #     command = pass_args(GNAT_INSTALL)
+    if args.install_gnat and (
+        not args.interactive
+        or input(
+            "Install GNAT community (optional; needed to build Ada services)? [Y/n] "
+        )
+        != "n"
+    ):
+        command = pass_args(GNAT_INSTALL)
 
-    #     if set_no_update:
-    #         command.cmd.append("--no-update")
+        if set_no_update:
+            command.cmd.append("--no-update")
 
-    #     run_command_and_exit_on_fail(command)
-    #     set_no_update = True
-    #     installed_gnat = True
+        run_command_and_exit_on_fail(command)
+        set_no_update = True
+        installed_gnat = True
 
-    if (
-        args.interactive and input("Install anod virtual environment? [Y/n] ") != "n"
-    ) or (not args.interactive and args.install_anod_venv):
+    if args.install_anod_venv and (
+        not args.interactive or input("Install anod virtual environment? [Y/n] ") != "n"
+    ):
         command = pass_args(VENV_INSTALL)
 
         if set_no_update:
@@ -148,22 +145,3 @@ if __name__ == "__main__":
         run_command_and_exit_on_fail(command)
         set_no_update = True
         installed_venv = True
-
-    if installed_gnat:
-        env_commands = str()
-
-        result = subprocess.run(GNAT_ENV.cmd, stdout=subprocess.PIPE)
-        env_commands += " " * 4 + result.stdout.decode(sys.stdout.encoding)
-
-        print(" ")
-        print(
-            wrap(
-                """\
-                Before attempting to build OpenUxAS, you need to update your
-                PATH. You should add at least the following to your profile:
-                """
-            )
-        )
-        print(" ")
-        print(env_commands)
-        print(" ")

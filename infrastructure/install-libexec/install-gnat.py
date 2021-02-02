@@ -28,16 +28,11 @@ from support.arguments import (
     add_apt_group,
     add_force_argument,
     add_dry_run_argument,
-    add_print_env_argument,
 )
 from support.commands import Command, run_command_and_exit_on_fail
 from support.log import configure_logging, log_wrap
+from support.paths import OPENUXAS_ROOT, SOFTWARE_DIR, GNAT_DIR
 
-
-# Directory in which this script is executing.
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CWD = os.getcwd()
-SOFTWARE_DIR = os.path.join(CWD, "software")
 
 APT_UPDATE = Command(
     cmd=["sudo", "apt", "update"],
@@ -85,28 +80,22 @@ GNAT_INSTALLER_CLONE = Command(
 )
 GNAT_INSTALLER_BIN = "install_package.sh"
 
-GNAT_INSTALL_DIR = os.path.join(SOFTWARE_DIR, "gnat")
 GNAT_INSTALL = Command(
     cmd=[
         "sh",
         GNAT_INSTALLER_BIN,
         os.path.join(GNAT_DOWNLOAD_DIR, GNAT_DOWNLOAD_FILE),
-        GNAT_INSTALL_DIR,
+        GNAT_DIR,
     ],
     description="Install GNAT community",
     cwd=GNAT_INSTALLER_DIR,
 )
 
-
-ENV_COMMANDS = f"""\
-PATH={os.path.join(GNAT_INSTALL_DIR, 'bin')}:$PATH\
-"""
-
 DESCRIPTION = """\
-This script automates the installation of GNAT Community. You should generally
-run this script from the root of bootstrap, like this:
+This script automates the installation of GNAT Community, which is required to
+build the Ada services for OpenUxAS. You should run this script like this:
 
-    `python3 util/install-gnat`
+    OpenUxAS$ infrastructure/install
 """
 
 if __name__ == "__main__":
@@ -116,7 +105,6 @@ if __name__ == "__main__":
         description=DESCRIPTION,
     )
 
-    add_print_env_argument(argument_parser)
     add_dry_run_argument(argument_parser)
     add_force_argument(argument_parser)
 
@@ -161,18 +149,14 @@ if __name__ == "__main__":
 
     configure_logging(args)
 
-    if args.printenv:
-        print(ENV_COMMANDS)
-        exit(0)
-
     skip_install_gnat = False
 
-    if os.path.exists(GNAT_INSTALL_DIR):
+    if os.path.exists(GNAT_DIR):
         if args.force:
             if args.dry_run:
-                print(f"rm -rf {GNAT_INSTALL_DIR}")
+                print(f"rm -rf {GNAT_DIR}")
             else:
-                shutil.rmtree(GNAT_INSTALL_DIR)
+                shutil.rmtree(GNAT_DIR)
         else:
             logging.warning(
                 log_wrap(
@@ -190,7 +174,7 @@ if __name__ == "__main__":
 
     if args.dry_run:
         # This is a bit awkward, but illustrates what we will do.
-        print("mkdir -p " + os.path.relpath(GNAT_DOWNLOAD_DIR, CWD))
+        print("mkdir -p " + os.path.relpath(GNAT_DOWNLOAD_DIR, OPENUXAS_ROOT))
     else:
         pathlib.Path(GNAT_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -262,4 +246,5 @@ if __name__ == "__main__":
     ):
         run_command_and_exit_on_fail(APT_INSTALL, args.dry_run)
 
+    print("Installing GNAT Community Edition; this may take a while.")
     run_command_and_exit_on_fail(GNAT_INSTALL, args.dry_run)

@@ -8,22 +8,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Load global paths
 source "${SCRIPT_DIR}/infrastructure/paths.sh"
 
-if [ -f ${VPYTHON_ACTIVATE} ]; then
-    # Activate the virtual environment
-    source "${VPYTHON_ACTIVATE}"
-else
-    echo "It looks like this is your first time running anod for this OpenUxAS clone."
-    echo "Let's install the infrastructure support on which anod depends."
-    echo " "
-
-    ${INFRASTRUCTURE_DIR}/install
-
-    if [ -f ${VPYTHON_ACTIVATE} ]; then
-        source "${VPYTHON_ACTIVATE}"
-    else
-        echo "Installing infrastructure support appears to have failed."
-        exit 1
-    fi
-fi
+# Activate the python venv
+activate_venv
 
 python3 "${INFRASTRUCTURE_DIR}/run-example.py" $@

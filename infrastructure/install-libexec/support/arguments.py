@@ -120,16 +120,6 @@ def add_dry_run_argument(argument_parser: ArgumentParser) -> None:
     )
 
 
-def add_print_env_argument(argument_parser: ArgumentParser) -> None:
-    """Add an argument to print the environment set up by the script."""
-    argument_parser.add_argument(
-        "--printenv",
-        action="store_true",
-        default=False,
-        help="print out the environment for the tools installed and quit",
-    )
-
-
 def add_force_argument(argument_parser: ArgumentParser) -> None:
     """Add an argument to set force."""
     argument_parser.add_argument(

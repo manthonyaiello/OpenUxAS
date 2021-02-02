@@ -2,23 +2,23 @@ on:
     push:
         paths:
             - 'infrastructure/uxas/**'
-            - 'src/cpp/**'
-            - 'tests/cpp/**'
+            - 'src/ada/**'
+            - 'tests/proof/**'
     pull_request:
         paths:
             - 'infrastructure/uxas/**'
-            - 'src/cpp/**'
-            - 'tests/cpp/**'
+            - 'src/ada/**'
+            - 'tests/proof/**'
 
-name: Build and Test UxAS C++
+name: "Build and Prove UxAS Ada Services"
 jobs:
     build:
         strategy:
             fail-fast: false
             matrix:
                 os: [ubuntu-18.04, ubuntu-20.04]
-                component: [uxas]
-                qualifier: [scenario=release, scenario=gcov]
+                component: [uxas-ada]
+                qualifier: [scenario=release]
                 python-version: [3.7, 3.8]
         runs-on: ${{ matrix.os }}
         steps:
@@ -36,12 +36,18 @@ jobs:
                   cd OpenUxAS
                   infrastructure/install -vv --no-gnat -y
 
-            - name: Build OpenUxAS C++
+            - name: Install GNAT CE 2020
+              if: ${{ matrix.component == 'uxas-ada' }}
+              uses: ada-actions/toolchain@ce2020
+              with:
+                  distrib: community
+
+            - name: Build OpenUxAS Ada
               run: |
                   cd OpenUxAS
                   ./anod -v build ${{ matrix.component }} --qualifier=${{ matrix.qualifier}}
 
-            - name: Test OpenUxAS C++
+            - name: Prove OpenUxAS Ada
               run: |
-                  cd OpenUxAS/tests/cpp
-                  ./run-tests --qualifier=${{ matrix.qualifier}}
+                  cd OpenUxAS/tests/proof
+                  ./run-proofs -E --timeout=2400 --failure-exit-code=1

@@ -15,7 +15,7 @@ ifneq ($(SKIP_ANOD_SETUP),true)
 
 	# Check if anod is available and export the uxas build environment if so
 	ifneq (,$(wildcard $(ANOD_BIN)))
-		ANODENV:=$(shell $(ANOD_BIN) --no-install printenv uxas --build-env --inline)
+		ANODENV:=$(shell NO_INSTALL_VENV=1 $(ANOD_BIN) printenv uxas --build-env --inline)
 	else
 		ANODENV:=
 	endif

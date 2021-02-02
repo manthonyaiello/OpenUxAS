@@ -27,7 +27,7 @@ class Boost(spec('common')):
 
     @Anod.primitive()
     def build(self):
-        bootstrap_args = [os.environ['SHELL'], './bootstrap.sh',
+        bootstrap_args = [os.environ.get('SHELL', '/bin/bash'), './bootstrap.sh',
                           '--prefix=%s' % unixpath(self['INSTALL_DIR']),
                           '--without-icu',
                           '--with-libraries=filesystem,system,regex,date_time']

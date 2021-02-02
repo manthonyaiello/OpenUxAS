@@ -54,5 +54,10 @@ VPYTHON_ACTIVATE = os.environ.get(
     "VPYTHON_ACTIVATE", os.path.join(VPYTHON_DIR, "bin", "activate")
 )
 
+SOFTWARE_DIR = os.environ.get(
+    "SOFTWARE_DIR", os.path.join(INFRASTRUCTURE_DIR, "software")
+)
+GNAT_DIR = os.environ.get("GNAT_DIR", os.path.join(SOFTWARE_DIR, "gnat"))
+
 SPEC_DIR = os.environ.get("SPEC_DIR", os.path.join(INFRASTRUCTURE_DIR, "specs"))
 SBX_DIR = os.environ.get("SBX_DIR", os.path.join(INFRASTRUCTURE_DIR, "sbx"))

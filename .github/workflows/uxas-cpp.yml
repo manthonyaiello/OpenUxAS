@@ -2,11 +2,15 @@ on:
     push:
         paths:
             - 'infrastructure/uxas/**'
+            - 'infrastructure/paths.sh'
+            - 'anod'
             - 'src/cpp/**'
             - 'tests/cpp/**'
     pull_request:
         paths:
             - 'infrastructure/uxas/**'
+            - 'infrastructure/paths.sh'
+            - 'anod'
             - 'src/cpp/**'
             - 'tests/cpp/**'
 

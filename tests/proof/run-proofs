@@ -16,7 +16,9 @@ ensure_gnat
 
 # Set the build env for uxas-ada, so that the libraries can be resolved by
 # gnatprove
-eval $( "${OPENUXAS_ROOT}/anod" printenv uxas-ada --build-env )
+debug "Run: eval \"$( \"${OPENUXAS_ROOT}/anod\" printenv uxas-ada --build-env )\""
+eval "$( "${OPENUXAS_ROOT}/anod" printenv uxas-ada --build-env )"
 
 # Run the proof checker
+debug "Run: python3 \"${TESTS_DIR}/proof/run-proofs.py\" $@"
 python3 "${TESTS_DIR}/proof/run-proofs.py" $@

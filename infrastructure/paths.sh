@@ -51,6 +51,7 @@ export SBX_DIR="${INFRASTRUCTURE_DIR}/sbx"
 function activate_venv {
     if [ -f ${VPYTHON_ACTIVATE} ]; then
         # Activate the virtual environment
+        debug "Run: source \"${VPYTHON_ACTIVATE}\""
         source "${VPYTHON_ACTIVATE}"
     else
         # This is here so that make doesn't halt with no visible output while
@@ -63,9 +64,11 @@ function activate_venv {
         echo "Let's install the infrastructure support on which anod depends."
         echo " "
 
+        debug "Run: ${INFRASTRUCTURE_DIR}/install"
         ${INFRASTRUCTURE_DIR}/install
 
         if [ -f ${VPYTHON_ACTIVATE} ]; then
+            debug "Run: source \"${VPYTHON_ACTIVATE}\""
             source "${VPYTHON_ACTIVATE}"
         else
             echo "Installing infrastructure support appears to have failed."
@@ -84,13 +87,16 @@ function ensure_gnat {
 
     if [ $? -ne 0 ]; then
         if [ -d "${GNAT_DIR}" ]; then
+            debug "Run: export PATH=\"${GNAT_DIR}/bin:${PATH}\""
             export PATH="${GNAT_DIR}/bin:${PATH}"
         else
             echo "For this step, you need an Ada compiler to continue."
             echo " "
+            debug "Run: ${INFRASTRUCTURE_DIR}/install --no-anod"
             ${INFRASTRUCTURE_DIR}/install --no-anod
 
             if [ -d "${GNAT_DIR}" ]; then
+                debug "Run: export PATH=\"${GNAT_DIR}/bin:${PATH}\""
                 export PATH="${GNAT_DIR}/bin:${PATH}"
             else
                 echo "Installing GNAT appears to have failed."
@@ -212,4 +218,32 @@ function get_first_positional_arg {
     done
 
     return 1
+}
+
+
+# Determine the logging level
+#
+# There's a bit of a weakness here, because if the user passes -v -v, it won't
+# be interpreted correctly. This could be addressed, but doesn't seem worth
+# the effort at the moment.
+if contains "$*" "-v"; then
+    _LOGLEVEL=8  # info
+elif contains "$*" "-vv"; then
+    _LOGLEVEL=10 # debug
+else
+    _LOGLEVEL=6  # warn
+fi
+
+# Provide informational output
+function info {
+    if [ ${_LOGLEVEL} -ge 8 ]; then
+        printf "\033[1;30mINFO\033[0m\t $*\n"
+    fi
+}
+
+# Provide debug output
+function debug {
+    if [ ${_LOGLEVEL} -ge 10  ]; then
+        printf "\033[0;36mDEBUG\033[0m\t $*\n"
+    fi
 }

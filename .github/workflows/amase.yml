@@ -2,9 +2,13 @@ on:
     push:
         paths:
             - 'infrastructure/uxas/**'
+            - 'infrastructure/paths.sh'
+            - 'anod'
     pull_request:
         paths:
             - 'infrastructure/uxas/**'
+            - 'infrastructure/paths.sh'
+            - 'anod'
 
 name: Build OpenAMASE
 jobs:

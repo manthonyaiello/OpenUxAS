@@ -11,4 +11,5 @@ source "${SCRIPT_DIR}/infrastructure/paths.sh"
 # Activate the python venv
 activate_venv
 
+debug "Run: python3 \"${INFRASTRUCTURE_DIR}/run-example.py\" $@"
 python3 "${INFRASTRUCTURE_DIR}/run-example.py" $@

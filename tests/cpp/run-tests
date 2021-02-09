@@ -14,19 +14,24 @@ activate_venv
 # A specified qualifier should be used to set the env for finding uxas
 qualifier=$( get_option "$*" "--qualifier" )
 if [[ -n ${qualifier} ]]; then
-    eval $( "${OPENUXAS_ROOT}/anod" printenv uxas "${qualifier}" )
+    debug "Run: eval \"$( \"${OPENUXAS_ROOT}/anod\" printenv uxas \"${qualifier}\" )\""
+    eval "$( "${OPENUXAS_ROOT}/anod" printenv uxas "${qualifier}" )"
 
     # Run the test harness
+    debug "Run: python3 \"${TESTS_DIR}/cpp/run-tests.py\" ${@/$qualifier}"
     python3 "${TESTS_DIR}/cpp/run-tests.py" ${@/$qualifier}
 
 # Assume the user would prefer to use the locally built uxas
 elif [ -f "${UXAS_BIN}" ]; then
+    debug "Run: PATH=\"${OBJ_DIR}/cpp:$PATH\" python3 \"${TESTS_DIR}/cpp/run-tests.py\" $@"
     PATH="${OBJ_DIR}/cpp:$PATH" python3 "${TESTS_DIR}/cpp/run-tests.py" $@
 
 # Try to find uxas for the user
 else
-    eval $( "${OPENUXAS_ROOT}/anod" printenv uxas )
+    debug "Run: eval \"$( \"${OPENUXAS_ROOT}/anod\" printenv uxas )\""
+    eval "$( "${OPENUXAS_ROOT}/anod" printenv uxas )"
 
     # Run the test harness
+    debug "Run: python3 \"${TESTS_DIR}/cpp/run-tests.py\" $@"
     python3 "${TESTS_DIR}/cpp/run-tests.py" $@
 fi

@@ -8,24 +8,28 @@ import argparse
 import logging
 import os
 import pathlib
-import re
 import shutil
 import subprocess
-import sys
 import time
 import traceback
 from typing import TYPE_CHECKING
 import yaml
 
-from uxas.paths import OPENUXAS_ROOT, EXAMPLES_DIR, ANOD_BIN, AMASE_DIR, UXAS_BIN
+from uxas.paths import (
+    OPENUXAS_ROOT,
+    EXAMPLES_DIR,
+    AMASE_DIR,
+    UXAS_BIN,
+    UXAS_ADA_BIN,
+    SBX_DIR,
+)
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace
     from typing import Any, Dict, List, Optional, Tuple
-    from os import _Environ
 
 
-# Allow the environment specify how long we should wait after starting an
+# Allow the environment to specify how long we should wait after starting an
 # instance of OpenAMASE; default to 0 seconds.
 AMASE_DELAY = os.environ.get("AMASE_DELAY", 0)
 
@@ -153,83 +157,77 @@ def resolve_examples_dir(args: Namespace) -> str:
 
 
 MISSING_AMASE = """\
-OpenAMASE source directory not specified and not defined in the environment.
-Either run with `--amase_dir` and specify the absolute path to OpenAMASE, or,
-if you are using anod to build OpenUxAS from the OpenUxAS-bootstrap repository,
-build OpenAMASE with:
+Before you can run examples that use OpenAMASE, you need to build it. You
+should:
 
-    anod build amase
+    "{root}/anod" build amase
+"""
+
+UNBUILT_SPECIFIED_AMASE = """\
+The OpenAMASE path `{path}` exists, but hasn't been built. You should:
+
+    cd "{path}/OpenAMASE" && ant
+
+You may need to put ant on your path first, like this:
+
+    eval "$( "{root}/anod" printenv ant )"
 """
 
 
 UNBUILT_LOCAL_AMASE = """\
-There is an OpenAMASE source directory next to OpenUxAS, but it has not been
-built. This script will try to use the copy of OpenAMASE built by anod, if you
-are using anod to build OpenUxAS. If this is not what you want, you should
-manually build OpenAMASE.
+There is an OpenAMASE in {path}, but it hasn't been built. If you
+want to use this version of OpenAMASE, you should:
+
+    cd "{path}/OpenAMASE" && ant
+
+You may need to put ant on your path first, like this:
+
+    eval "$( "{root}/anod" printenv ant )"
+
+Trying the anod-built OpenAMASE as a fall back.
 """
+
+
+def check_amase_dir(path: str) -> bool:
+    """Test to make sure a path has the OpenUxAS build."""
+    return os.path.exists(os.path.join(path, "OpenAMASE", "build"))
 
 
 def resolve_amase_dir(args: Namespace) -> str:
     """
     Resolve the absolute path to the OpenAMASE source directory.
 
-    1. if we've been given an absolute path in the arguments, use that.
-    2. see if there's a local OpenAMASE and use that.
-    3. see if OpenAMASE is in the environment variables.
+    1. if we've been given an absolute path in the arguments, check and use
+       that.
+    2. see if there's a local OpenAMASE, check and use that.
+    3. try to use the anod-built OpenAMASE.
 
-    If not, print a message and immediately exit.
+    If the OpenAMASE directory exists but doesn't appear to be built,
+    immediately exit.
     """
     if args.amase_dir:
-        return args.amase_dir
+        if check_amase_dir(args.amase_dir):
+            return args.amase_dir
+        else:
+            logging.critical(
+                UNBUILT_SPECIFIED_AMASE.format(path=args.amase_dir, root=OPENUXAS_ROOT)
+            )
+            exit(1)
 
     if os.path.exists(AMASE_DIR):
-        build_dir = os.path.join(AMASE_DIR, "OpenAMASE", "build")
-        if os.path.exists(build_dir):
+        if check_amase_dir(AMASE_DIR):
             return AMASE_DIR
         else:
-            logging.warning(UNBUILT_LOCAL_AMASE)
+            logging.warning(
+                UNBUILT_LOCAL_AMASE.format(path=AMASE_DIR, root=OPENUXAS_ROOT)
+            )
 
-    if AMASE_SRC_DIR is None:
-        logging.critical(MISSING_AMASE)
+    anod_amase_dir = os.path.join(SBX_DIR, "x86_64-linux", "amase", "src")
+    if os.path.exists(anod_amase_dir) and check_amase_dir(anod_amase_dir):
+        return anod_amase_dir
+    else:
+        logging.critical(MISSING_AMASE.format(root=OPENUXAS_ROOT))
         exit(1)
-
-    return AMASE_SRC_DIR
-
-
-MISSING_UXAS = """\
-The command `uxas` cannot be found on your path. Either run with `--uxas-bin`
-and specify the absolute path to the OpenUXAS binary, manually add the OpenUxAS
-binary to your path, or, if you are using anod to build OpenUxAS from the
-OpenUxAS-bootstrap repository, build OpenUxAS with:
-
-    anod build uxas
-"""
-
-
-def resolve_uxas_bin(args: Namespace) -> str:
-    """
-    Resolve the OpenUxAS binary.
-
-    1. if we've been given a path in the arguments, use that.
-    2. see if there's a local uxas that's been built and use that.
-    3. see if uxas is on the path.
-
-    If not, print a message and immediately exit.
-    """
-    if args.uxas_bin:
-        return args.uxas_bin
-
-    if os.path.exists(UXAS_BIN):
-        return UXAS_BIN
-
-    uxas_path = shutil.which("uxas")
-
-    if uxas_path is None:
-        logging.critical(MISSING_UXAS)
-        exit(1)
-
-    return uxas_path
 
 
 def list_examples(examples_dir: str) -> None:
@@ -258,16 +256,12 @@ def check_amase(
         return (None, 0)
 
     if SCENARIO_YAML_KEY not in loaded_yaml[AMASE_YAML_KEY].keys():
-        logging.critical(
-            "OpenAMASE configuration must specify a scenario file."
-        )
+        logging.critical("OpenAMASE configuration must specify a scenario file.")
         exit(1)
 
     scenario_file = loaded_yaml[AMASE_YAML_KEY][SCENARIO_YAML_KEY]
     if not os.path.exists(os.path.join(example_dir, scenario_file)):
-        logging.critical(
-            f"Specified scenario file '{scenario_file}' does not exist."
-        )
+        logging.critical(f"Specified scenario file '{scenario_file}' does not exist.")
         exit(1)
 
     if args.amase_delay is not None:
@@ -280,9 +274,7 @@ def check_amase(
     return (scenario_file, amase_delay)
 
 
-def run_amase(
-    scenario_file: str, example_dir: str, amase_dir: str, env: _Environ
-) -> subprocess.Popen:
+def run_amase(scenario_file: str, example_dir: str, amase_dir: str) -> subprocess.Popen:
     """Run the OpenAMASE part of the example."""
     amase_cmd = [
         "java",
@@ -302,16 +294,14 @@ def run_amase(
         f"             {amase_dir}\n"
         f"         with scenario '{scenario_file}'."
     )
-    logging.debug(f"amase_cmd={amase_cmd}")
-
-    return subprocess.Popen(
-        amase_cmd, cwd=os.path.join(amase_dir, "OpenAMASE"), env=env
+    logging.debug(
+        f"Run: cd {os.path.join(amase_dir, 'OpenAMASE')}; {' '.join(amase_cmd)}"
     )
 
+    return subprocess.Popen(amase_cmd, cwd=os.path.join(amase_dir, "OpenAMASE"))
 
-def check_uxas(
-    loaded_yaml: Dict[str, Any], args: Namespace
-) -> List[Dict[str, str]]:
+
+def check_uxas(loaded_yaml: Dict[str, Any], args: Namespace) -> List[Dict[str, str]]:
     """
     Check the OpenUxAS configuration in the YAML and return a list of configs.
 
@@ -328,18 +318,51 @@ def check_uxas(
     return uxas_configs
 
 
+def find_uxas_bin(bin_name: str) -> Optional[str]:
+    """
+    Attempt to find the path the given binary.
+
+    Look for the binary in this order:
+      1. on the user's path
+      2. in the expected locally-built location
+      3. in the expected release anod directory
+
+    Note that items 2 and 3 are language specific.
+    """
+    if shutil.which(bin_name) is not None:
+        exit(1)
+        return shutil.which(bin_name)
+
+    if bin_name == "uxas":
+        local_bin_path = UXAS_BIN
+        anod_bin_path = os.path.join(
+            SBX_DIR, "x86_64-linux", "uxas-release", "install", "bin", "uxas"
+        )
+    elif bin_name == "uxas-ada":
+        local_bin_path = UXAS_ADA_BIN
+        anod_bin_path = os.path.join(
+            SBX_DIR, "x86_64-linux", "uxas-ada-release", "install", "bin", "uxas-ada"
+        )
+    else:
+        # We don't know how to handle this language
+        return None
+
+    if os.path.exists(local_bin_path):
+        return local_bin_path
+    elif os.path.exists(anod_bin_path):
+        return anod_bin_path
+    else:
+        return None
+
+
 MISSING_BIN = """\
-The command `%s` cannot be found on your path. Either specify the absolute path
-to the desired OpenUXAS binary in the config file (*not recommended*), manually
-add the desired OpenUxAS binary to your path, or, if you are using anod to
-build OpenUxAS from the OpenUxAS-bootstrap repository, build the desired
-version of OpenUxAS with, e.g.:
+The command `{bin}` cannot be found on your path. Either specify the absolute
+path to the desired OpenUXAS binary in the config file (*not recommended*),
+manually add the desired OpenUxAS binary to your path, perfom a local build of
+the binary (e.g., for C++, `make -j all`) or use anod to build the desired
+version of OpenUxAS with, e.g., for C++:
 
-    anod-build uxas-ada
-
-and then set your environment with:
-
-    eval `anod-setenv uxas-ada`
+    "{root}/anod" build {bin}
 """
 
 
@@ -355,9 +378,7 @@ def check_one_uxas(record: Dict[str, str], args: Namespace) -> Dict[str, str]:
 
     config_file = record[CONFIG_YAML_KEY]
     if not os.path.exists(os.path.join(example_dir, config_file)):
-        logging.critical(
-            f"Specified config file '{config_file}' does not exist."
-        )
+        logging.critical(f"Specified config file '{config_file}' does not exist.")
         exit(1)
 
     run_dir_name = RUN_DIR
@@ -366,13 +387,13 @@ def check_one_uxas(record: Dict[str, str], args: Namespace) -> Dict[str, str]:
 
     if BIN_YAML_KEY in record.keys():
         bin_name = record[BIN_YAML_KEY]
-        if shutil.which(bin_name) is not None:
-            uxas_binary = bin_name
-        else:
-            logging.critical(MISSING_BIN % bin_name)
-            exit(1)
     else:
-        uxas_binary = resolve_uxas_bin(args)
+        bin_name = "uxas"
+
+    uxas_binary = find_uxas_bin(bin_name)
+    if uxas_binary is None:
+        logging.critical(MISSING_BIN.format(bin=bin_name, root=OPENUXAS_ROOT))
+        exit(1)
 
     return {
         "config_file": config_file,
@@ -382,15 +403,12 @@ def check_one_uxas(record: Dict[str, str], args: Namespace) -> Dict[str, str]:
 
 
 def run_uxas(
-    uxas_configs: List[Dict[str, str]],
-    example_dir: str,
-    popen: bool,
-    env: _Environ,
+    uxas_configs: List[Dict[str, str]], example_dir: str, popen: bool
 ) -> List[subprocess.Popen]:
     """Run an OpenUxAS instance for each configuration."""
     pids = list()
     for config in uxas_configs:
-        pid = run_one_uxas(config, example_dir, popen, env)
+        pid = run_one_uxas(config, example_dir, popen)
         if pid is not None:
             pids.append(pid)
 
@@ -401,7 +419,7 @@ def run_uxas(
 
 
 def run_one_uxas(
-    uxas_config: Dict[str, str], example_dir: str, popen: bool, env: _Environ
+    uxas_config: Dict[str, str], example_dir: str, popen: bool
 ) -> Optional[subprocess.Popen]:
     """Run one OpenUxAS instance."""
     config_file = uxas_config["config_file"]
@@ -422,9 +440,9 @@ def run_one_uxas(
             "         Data and logfiles are in:\n"
             f"             {run_dir}"
         )
-        logging.debug(f"uxas_cmd = {uxas_cmd}")
+        logging.debug(f"Run: cd {run_dir}; {' '.join(uxas_cmd)}")
 
-        return subprocess.Popen(uxas_cmd, cwd=run_dir, env=env)
+        return subprocess.Popen(uxas_cmd, cwd=run_dir)
     else:
         logging.info(
             "Running OpenUxAS binary\n"
@@ -434,9 +452,9 @@ def run_one_uxas(
             "         Data and logfiles are in:\n"
             f"             {run_dir}"
         )
-        logging.debug(f"uxas_cmd = {uxas_cmd}")
+        logging.debug(f"Run: cd {run_dir}; {' '.join(uxas_cmd)}")
 
-        subprocess.run(uxas_cmd, cwd=run_dir, env=env)
+        subprocess.run(uxas_cmd, cwd=run_dir)
         return None
 
 
@@ -459,28 +477,6 @@ def killall_uxases(popen: bool, pids: List[subprocess.Popen]) -> None:
                 time.sleep(0.1)
                 if pid.poll() is None:
                     logging.error(f"  Unable to kill PID {pid.pid}.")
-
-
-def compute_env() -> _Environ:
-    """Compute the environment for running commands."""
-    base_env = os.environ
-
-    anod_cmd = [ANOD_BIN, "printenv", "--inline"]
-
-    if os.path.exists(ANOD_BIN):
-        for spec in ["uxas", "amase"]:
-            cmd = anod_cmd + [spec]
-            result = subprocess.run(cmd, capture_output=True, env=base_env)
-            a = re.split(
-                r"[ =]",
-                re.sub(
-                    r'"', "", result.stdout.decode(sys.stdout.encoding)
-                ).strip(),
-            )
-            for i in range(0, len(a), 2):
-                base_env[a[i]] = a[i + 1]
-
-    return base_env
 
 
 # From
@@ -554,8 +550,7 @@ if __name__ == "__main__":
 
     ap.add_argument(
         "--amase-dir",
-        help="absolute path to the OpenAMASE repository "
-        "containing build outputs",
+        help="absolute path to the OpenAMASE repository containing build outputs",
     )
 
     ap.add_argument("--uxas-bin", help="absolute path to the OpenUxAS binary")
@@ -563,13 +558,10 @@ if __name__ == "__main__":
     ap.add_argument(
         "--uxas-dir",
         default=OPENUXAS_ROOT,
-        help="absolute path to the OpenUxAS repository "
-        "containing build outputs",
+        help="absolute path to the OpenUxAS repository containing build outputs",
     )
 
-    ap.add_argument(
-        "--examples-dir", help="absolute path to the root of the examples"
-    )
+    ap.add_argument("--examples-dir", help="absolute path to the root of the examples")
 
     ap.add_argument(
         "-l",
@@ -657,21 +649,13 @@ if __name__ == "__main__":
 
         loaded_yaml = read_yaml(yaml_filename)
 
-        env = compute_env()
-
-        # Allow the OpenAMASE source directory to be specified as an environment
-        # variable, so that we can interface with anod.
-        AMASE_SRC_DIR = env.get("AMASE_SOURCE_DIR")
-
         amase_dir = resolve_amase_dir(args)
-        (scenario_file, amase_delay) = check_amase(
-            loaded_yaml, example_dir, args
-        )
+        (scenario_file, amase_delay) = check_amase(loaded_yaml, example_dir, args)
 
         uxas_configs = check_uxas(loaded_yaml, args)
 
         if scenario_file:
-            amase_pid = run_amase(scenario_file, example_dir, amase_dir, env)
+            amase_pid = run_amase(scenario_file, example_dir, amase_dir)
 
             if amase_delay > 0:
                 print(
@@ -681,7 +665,7 @@ if __name__ == "__main__":
                 time.sleep(amase_delay)
 
         popen = scenario_file is not None
-        pids = run_uxas(uxas_configs, example_dir, popen, env)
+        pids = run_uxas(uxas_configs, example_dir, popen)
 
         if scenario_file:
             # Wait for the user to close AMASE

@@ -69,6 +69,8 @@ src/ada/proof/sessions/*/*.gz.bak
 
 # object files
 obj
+objs
+uxas-ada
 
 # testsuite results
 tests/cpp/log

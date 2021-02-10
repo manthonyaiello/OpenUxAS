@@ -133,6 +133,7 @@ help:
 clean:
 	@echo "[Remove objects]"
 	rm -f $(OBJECTS)
+	rm -rf $(OBJECT_DIR)/uxas
 	@echo "[Remove makefile fragments (dependencies)]"
 	rm -f $(DEPS)
 

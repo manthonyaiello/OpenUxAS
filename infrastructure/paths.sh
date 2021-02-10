@@ -27,6 +27,7 @@ export CPP_DIR="${SRC_DIR}/cpp"
 export ADA_DIR="${SRC_DIR}/ada"
 
 export UXAS_BIN="${OBJ_DIR}/cpp/uxas"
+export UXAS_ADA_BIN="${ADA_DIR}/uxas-ada"
 
 # For LmcpGen and OpenAMASE
 export SUPPORT_DIR="${OPENUXAS_ROOT}/develop"

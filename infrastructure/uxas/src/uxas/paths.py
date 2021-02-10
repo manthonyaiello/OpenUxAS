@@ -43,6 +43,7 @@ CPP_DIR = os.environ.get("CPP_DIR", os.path.join(SRC_DIR, "cpp"))
 ADA_DIR = os.environ.get("ADA_DIR", os.path.join(SRC_DIR, "ada"))
 
 UXAS_BIN = os.environ.get("UXAS_BIN", os.path.join(OPENUXAS_ROOT, "cpp", "uxas"))
+UXAS_ADA_BIN = os.environ.get("UXAS_ADA_BIN", os.path.join(ADA_DIR, "uxas-ada"))
 
 # For LmcpGen and OpenAMASE
 SUPPORT_DIR = os.environ.get("SUPPORT_DIR", os.path.join(OPENUXAS_ROOT, "develop"))

@@ -50,7 +50,7 @@ function _anod {
                 echo "\`anod setenv\`"
                 return 1
             else
-                debug "Run: eval \"$( python3 -c \"${ANOD_SCRIPT}\" printenv ${@/$command} )\""
+                debug "Run: eval \"\$( python3 -c \"${ANOD_SCRIPT}\" printenv ${@/$command} )\""
                 eval "$( python3 -c "${ANOD_SCRIPT}" printenv ${@/$command} )"
             fi
             ;;

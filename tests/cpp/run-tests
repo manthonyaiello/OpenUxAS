@@ -14,7 +14,7 @@ activate_venv
 # A specified qualifier should be used to set the env for finding uxas
 qualifier=$( get_option "$*" "--qualifier" )
 if [[ -n ${qualifier} ]]; then
-    debug "Run: eval \"$( \"${OPENUXAS_ROOT}/anod\" printenv uxas \"${qualifier}\" )\""
+    debug "Run: eval \"\$( \"${OPENUXAS_ROOT}/anod\" printenv uxas \"${qualifier}\" )\""
     eval "$( "${OPENUXAS_ROOT}/anod" printenv uxas "${qualifier}" )"
 
     # Run the test harness
@@ -28,7 +28,7 @@ elif [ -f "${UXAS_BIN}" ]; then
 
 # Try to find uxas for the user
 else
-    debug "Run: eval \"$( \"${OPENUXAS_ROOT}/anod\" printenv uxas )\""
+    debug "Run: eval \"\$( \"${OPENUXAS_ROOT}/anod\" printenv uxas )\""
     eval "$( "${OPENUXAS_ROOT}/anod" printenv uxas )"
 
     # Run the test harness

@@ -29,6 +29,13 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple
 
 
+# Relativized root
+REL_OPENUXAS_ROOT = os.path.relpath(OPENUXAS_ROOT)
+
+# Anod command
+ANOD_CMD = os.path.join(REL_OPENUXAS_ROOT, "anod")
+
+
 # Allow the environment to specify how long we should wait after starting an
 # instance of OpenAMASE; default to 0 seconds.
 AMASE_DELAY = os.environ.get("AMASE_DELAY", 0)
@@ -160,7 +167,7 @@ MISSING_AMASE = """\
 Before you can run examples that use OpenAMASE, you need to build it. You
 should:
 
-    "{root}/anod" build amase
+    {anod} build amase
 """
 
 UNBUILT_SPECIFIED_AMASE = """\
@@ -170,7 +177,7 @@ The OpenAMASE path `{path}` exists, but hasn't been built. You should:
 
 You may need to put ant on your path first, like this:
 
-    eval "$( "{root}/anod" printenv ant )"
+    eval "$( {anod} printenv ant )"
 """
 
 
@@ -182,7 +189,7 @@ want to use this version of OpenAMASE, you should:
 
 You may need to put ant on your path first, like this:
 
-    eval "$( "{root}/anod" printenv ant )"
+    eval "$( {anod} printenv ant )"
 
 Trying the anod-built OpenAMASE as a fall back.
 """
@@ -210,7 +217,7 @@ def resolve_amase_dir(args: Namespace) -> str:
             return args.amase_dir
         else:
             logging.critical(
-                UNBUILT_SPECIFIED_AMASE.format(path=args.amase_dir, root=OPENUXAS_ROOT)
+                UNBUILT_SPECIFIED_AMASE.format(path=args.amase_dir, anod=ANOD_CMD)
             )
             exit(1)
 
@@ -219,14 +226,14 @@ def resolve_amase_dir(args: Namespace) -> str:
             return AMASE_DIR
         else:
             logging.warning(
-                UNBUILT_LOCAL_AMASE.format(path=AMASE_DIR, root=OPENUXAS_ROOT)
+                UNBUILT_LOCAL_AMASE.format(path=AMASE_DIR, anod=ANOD_CMD)
             )
 
     anod_amase_dir = os.path.join(SBX_DIR, "x86_64-linux", "amase", "src")
     if os.path.exists(anod_amase_dir) and check_amase_dir(anod_amase_dir):
         return anod_amase_dir
     else:
-        logging.critical(MISSING_AMASE.format(root=OPENUXAS_ROOT))
+        logging.critical(MISSING_AMASE.format(anod=ANOD_CMD))
         exit(1)
 
 
@@ -362,7 +369,7 @@ manually add the desired OpenUxAS binary to your path, perfom a local build of
 the binary (e.g., for C++, `make -j all`) or use anod to build the desired
 version of OpenUxAS with, e.g., for C++:
 
-    "{root}/anod" build {bin}
+    {anod} build {bin}
 """
 
 
@@ -392,7 +399,7 @@ def check_one_uxas(record: Dict[str, str], args: Namespace) -> Dict[str, str]:
 
     uxas_binary = find_uxas_bin(bin_name)
     if uxas_binary is None:
-        logging.critical(MISSING_BIN.format(bin=bin_name, root=OPENUXAS_ROOT))
+        logging.critical(MISSING_BIN.format(bin=bin_name, anod=ANOD_CMD))
         exit(1)
 
     return {

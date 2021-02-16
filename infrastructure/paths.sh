@@ -65,8 +65,8 @@ function activate_venv {
         echo "Let's install the infrastructure support on which anod depends."
         echo " "
 
-        debug "Run: ${INFRASTRUCTURE_DIR}/install"
-        ${INFRASTRUCTURE_DIR}/install
+        debug "Run: ${INFRASTRUCTURE_DIR}/install --no-gnat"
+        ${INFRASTRUCTURE_DIR}/install --no-gnat
 
         if [ -f ${VPYTHON_ACTIVATE} ]; then
             debug "Run: source \"${VPYTHON_ACTIVATE}\""

@@ -1,5 +1,5 @@
 # Platform
-PLATFORM:=$(shell python -c "import sys; print(sys.platform)")
+PLATFORM:=$(shell python3 -c "import sys; print(sys.platform)")
 
 # Path to the makefile and containing directory
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))

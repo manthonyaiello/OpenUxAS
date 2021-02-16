@@ -3,6 +3,7 @@ on:
         paths:
             - 'infrastructure/uxas/**'
             - 'infrastructure/paths.sh'
+            - 'infrastructure/specs/amase.anod'
             - 'anod'
     pull_request:
         paths:
@@ -31,10 +32,15 @@ jobs:
               with:
                   python-version: ${{ matrix.python-version }}
 
+            - name: Set up java
+              uses: actions/setup-java@v1
+              with:
+                  java-version: '11'
+
             - name: Install infrastructure
               run: |
                   cd OpenUxAS
-                  infrastructure/install -vv --no-gnat -y
+                  infrastructure/install -vv --no-gnat --no-java -y
 
             - name: Build OpenAMASE
               run: |

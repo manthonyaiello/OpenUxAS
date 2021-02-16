@@ -6,13 +6,14 @@ Install GNAT script.
 This script automates the download and install of GNAT Community, which is
 required to build the Ada services for OpenUxAS.
 
-Run this script from the root of bootstrap, like this:
+Run this script via `infrastructure/install` from the root of your repository,
+like this:
 
-    python3 util/install-gnat
+    OpenUxAS$ infrastructure/install
 
-To get more information and to control the script's behavior, run:
+To get more information and to better control the install, run:
 
-    python3 util/install --help
+    OpenUxAS$ infrastructure/install --help
 """
 
 from __future__ import annotations

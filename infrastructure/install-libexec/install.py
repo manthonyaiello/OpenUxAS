@@ -36,13 +36,14 @@ GNAT_INSTALL = Command(
     description="Install gnat",
 )
 
-GNAT_ENV = Command(
-    cmd=GNAT_INSTALL.cmd + ["--printenv"],
-)
-
 VENV_INSTALL = Command(
     cmd=[sys.executable, os.path.join(INSTALL_LIBEXEC_DIR, "install-anod-venv.py")],
     description="Install anod venv",
+)
+
+JAVA_INSTALL = Command(
+    cmd=[sys.executable, os.path.join(INSTALL_LIBEXEC_DIR, "install-java.py"), "-y"],
+    description="Install Java",
 )
 
 
@@ -50,6 +51,18 @@ def pass_args(command: Command) -> Command:
     """Add all arguments provided to this script to a command."""
     command.cmd += sys.argv[1:]
     return command
+
+
+JAVA_PROMPT = """\
+Install Java (OpenJDK 11) using apt?
+
+*WARNING* If you already have a version of Java >= 11 installed, you probably
+*should not* install Java using this script. If you're unsure, you can find out
+by trying:
+
+    $ java -version
+
+Proceed and install Java? [Y/n] """
 
 
 DESCRIPTION = """\
@@ -79,8 +92,7 @@ if __name__ == "__main__":
         dest="install_gnat",
         action="store_true",
         default=True,
-        help="install GNAT community; run `util/install-gnat --help` for "
-        "additional gnat options",
+        help="install GNAT community",
     )
     gnat_group.add_argument(
         "--no-gnat",
@@ -98,14 +110,31 @@ if __name__ == "__main__":
         dest="install_anod_venv",
         action="store_true",
         default=True,
-        help="install anod virtual environment; run `util/install-anod --help`"
-        " for additional anod options",
+        help="install anod virtual environment",
     )
     anod_group.add_argument(
         "--no-anod",
         dest="install_anod_venv",
         action="store_false",
         help="do not install anod virtual environment",
+    )
+
+    meta_java_group = argument_parser.add_argument_group(
+        "java (OpenJDK 11) installation"
+    )
+    java_group = meta_java_group.add_mutually_exclusive_group()
+    java_group.add_argument(
+        "--java",
+        dest="install_java",
+        action="store_true",
+        default=True,
+        help="install Java (OpenJDK 11)",
+    )
+    java_group.add_argument(
+        "--no-java",
+        dest="install_java",
+        action="store_false",
+        help="do not install Java",
     )
 
     add_logging_group(argument_parser)
@@ -115,8 +144,26 @@ if __name__ == "__main__":
     configure_logging(args)
 
     set_no_update = False
-    installed_gnat = False
-    installed_venv = False
+
+    if args.install_anod_venv and (
+        not args.interactive or input("Install anod virtual environment? [Y/n] ") != "n"
+    ):
+        command = pass_args(VENV_INSTALL)
+
+        if set_no_update:
+            command.cmd.append("--no-update")
+
+        run_command_and_exit_on_fail(command)
+        set_no_update = True
+
+    if args.install_java and (not args.interactive or input(JAVA_PROMPT) != "n"):
+        command = pass_args(JAVA_INSTALL)
+
+        if set_no_update:
+            command.cmd.append("--no-update")
+
+        run_command_and_exit_on_fail(command)
+        set_no_update = True
 
     if args.install_gnat and (
         not args.interactive
@@ -132,16 +179,3 @@ if __name__ == "__main__":
 
         run_command_and_exit_on_fail(command)
         set_no_update = True
-        installed_gnat = True
-
-    if args.install_anod_venv and (
-        not args.interactive or input("Install anod virtual environment? [Y/n] ") != "n"
-    ):
-        command = pass_args(VENV_INSTALL)
-
-        if set_no_update:
-            command.cmd.append("--no-update")
-
-        run_command_and_exit_on_fail(command)
-        set_no_update = True
-        installed_venv = True

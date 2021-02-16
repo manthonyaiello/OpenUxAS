@@ -36,11 +36,8 @@ class UxasLMCP(spec('common')):
 
     @property
     def build_deps(self):
-        result = [Anod.Dependency('lmcpgen'),
-                  Anod.Dependency('java')]
-        if self.language == 'java':
-            result.append(Anod.Dependency('ant'))
-        elif self.language in ('cpp', 'ada'):
+        result = [Anod.Dependency('lmcpgen')]
+        if self.language in ('cpp', 'ada'):
             result.append(Anod.Dependency('compiler'))
 
         return result
@@ -69,7 +66,6 @@ class UxasLMCP(spec('common')):
 
     @Anod.primitive()
     def build(self):
-        self.deps['java'].setenv()
         self.deps['lmcpgen'].generate(
             language=self.language,
             model_dir=self['SRC_DIR'],
@@ -89,7 +85,6 @@ class UxasLMCP(spec('common')):
                 cp(include_file, target_file)
 
         elif self.language == 'java':
-            self.deps['ant'].setenv()
             self.shell('ant', 'jar',
                        cwd=self.build_space.build_dir)
             sync_tree(os.path.join(self.build_space.build_dir, 'dist'),

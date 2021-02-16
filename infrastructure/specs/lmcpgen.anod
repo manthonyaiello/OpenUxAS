@@ -15,8 +15,7 @@ class LmcpGen(spec('common')):
 
     @property
     def build_deps(self):
-        return [Anod.Dependency('java'),
-                Anod.Dependency('ant')]
+        return []
 
     @property
     def source_pkg_build(self):
@@ -31,8 +30,7 @@ class LmcpGen(spec('common')):
             '-mdmdir', model_dir, '-dir', install_dir, '-%s' % language)
 
     def build_setenv(self):
-        self.deps['java'].setenv()
-        self.deps['ant'].setenv()
+        pass
 
     @Anod.primitive()
     def build(self):

@@ -5,13 +5,16 @@ Install anod virtual environment script.
 
 This script automates the installation of the anod virtual environment, which
 is required to build OpenUxAS using anod. You should generally run this script
-from the root of bootstrap, like this:
+from the root of your repository, like this:
 
-    python3 util/install-anod-venv
+Run this script via `infrastructure/install` from the root of your repository,
+like this:
 
-To get more information and to control the script's behavior, run:
+    OpenUxAS$ infrastructure/install
 
-    python3 util/install-anod-venv --help
+To get more information and to better control the install, run:
+
+    OpenUxAS$ infrastructure/install --help
 """
 
 from __future__ import annotations

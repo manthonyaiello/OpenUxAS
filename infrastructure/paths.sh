@@ -93,8 +93,8 @@ function ensure_gnat {
         else
             echo "For this step, you need an Ada compiler to continue."
             echo " "
-            debug "Run: ${INFRASTRUCTURE_DIR}/install --no-anod"
-            ${INFRASTRUCTURE_DIR}/install --no-anod
+            debug "Run: ${INFRASTRUCTURE_DIR}/install --no-anod --no-java"
+            ${INFRASTRUCTURE_DIR}/install --no-anod --no-java
 
             if [ -d "${GNAT_DIR}" ]; then
                 debug "Run: export PATH=\"${GNAT_DIR}/bin:${PATH}\""

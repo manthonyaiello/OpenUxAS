@@ -337,7 +337,6 @@ def find_uxas_bin(bin_name: str) -> Optional[str]:
     Note that items 2 and 3 are language specific.
     """
     if shutil.which(bin_name) is not None:
-        exit(1)
         return shutil.which(bin_name)
 
     if bin_name == "uxas":

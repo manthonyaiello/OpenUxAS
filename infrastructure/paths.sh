@@ -64,15 +64,32 @@ function activate_venv {
         echo "It looks like this is your first time running anod for this OpenUxAS clone."
         echo "Let's install the infrastructure support on which anod depends."
         echo " "
+        echo "To do this, we will use apt. We will update the index and install all needed"
+        echo "packages automatically. If you would prefer more control over how dependencies"
+        echo "are installed, simply say 'n' and manually run the installer to be guided"
+        echo "through all of the options."
+        echo " "
+        echo "Note: as part of this process, we will install Java 11 using apt. If you have"
+        echo "already installed any other version of Java, you may wish to say 'n' and"
+        echo "manually run the installer so that you can skip this step."
+        echo " "
+        echo -n "Okay to proceed? [Y/n]: "
+        read _response
 
-        debug "Run: ${INFRASTRUCTURE_DIR}/install --no-gnat"
-        ${INFRASTRUCTURE_DIR}/install --no-gnat
+        if [[ "${_response}" != "n" ]]; then
+            debug "Run: ${INFRASTRUCTURE_DIR}/install --no-gnat --automatic"
+            ${INFRASTRUCTURE_DIR}/install --no-gnat --automatic
 
-        if [ -f ${VPYTHON_ACTIVATE} ]; then
-            debug "Run: source \"${VPYTHON_ACTIVATE}\""
-            source "${VPYTHON_ACTIVATE}"
+            if [ -f ${VPYTHON_ACTIVATE} ]; then
+                debug "Run: source \"${VPYTHON_ACTIVATE}\""
+                source "${VPYTHON_ACTIVATE}"
+            else
+                echo "Installing infrastructure support appears to have failed."
+                exit 1
+            fi
         else
-            echo "Installing infrastructure support appears to have failed."
+            echo "Okay. You should run \`${INFRASTRUCTURE_DIR}/install\` manually."
+            echo " "
             exit 1
         fi
     fi
@@ -92,17 +109,31 @@ function ensure_gnat {
             export PATH="${GNAT_DIR}/bin:${PATH}"
         else
             echo "For this step, you need an Ada compiler to continue."
+            echo "Let's install the GNAT Community compiler and support on which it depends."
             echo " "
-            debug "Run: ${INFRASTRUCTURE_DIR}/install --no-anod --no-java"
-            ${INFRASTRUCTURE_DIR}/install --no-anod --no-java
+            echo "To do this, we will use apt. We will update the index and install all needed"
+            echo "packages automatically. If you would prefer more control over how dependencies"
+            echo "are installed, simply say 'n' and manually run the installer to be guided"
+            echo "through all of the options."
+            echo " "
+            echo -n "Okay to proceed? [Y/n]: "
+            read _response
 
-            if [ -d "${GNAT_DIR}" ]; then
-                debug "Run: export PATH=\"${GNAT_DIR}/bin:${PATH}\""
-                export PATH="${GNAT_DIR}/bin:${PATH}"
+            if [[ "${_response}" != "n" ]]; then
+                debug "Run: ${INFRASTRUCTURE_DIR}/install --no-anod --no-java --automatic"
+                ${INFRASTRUCTURE_DIR}/install --no-anod --no-java --automatic
+
+                if [ -d "${GNAT_DIR}" ]; then
+                    debug "Run: export PATH=\"${GNAT_DIR}/bin:${PATH}\""
+                    export PATH="${GNAT_DIR}/bin:${PATH}"
+                else
+                    echo "Installing GNAT appears to have failed."
+                    exit 1
+                fi
             else
-                echo "Installing GNAT appears to have failed."
-
-                return 1
+                echo "Okay. You should run \`${INFRASTRUCTURE_DIR}/install\` manually."
+                echo " "
+                exit 1
             fi
         fi
     fi

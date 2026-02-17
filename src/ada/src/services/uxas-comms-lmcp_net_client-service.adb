@@ -1,4 +1,5 @@
 with SPARK.Containers.Formal.Hashed_Maps;
+with Ada.Containers;
 with Ada.Strings.Hash;
 with Ada.Directories;
 

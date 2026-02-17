@@ -119,14 +119,17 @@ package Route_Aggregator with SPARK_Mode, Always_Terminates is
    --  State of the service is modified more often, data can be removed as
    --  well has added. Use formal containers for efficiency.
 
-   function No_Overlaps (pendingRoute : Int_Set_Maps_M.Map) return Boolean;
+   function No_Overlaps (pendingRoute : Int_Set_Maps_M.Map) return Boolean
+      with Ghost;
 
-   function No_Overlaps (pendingRoute, pendingAutoReq : Int_Set_Maps_M.Map) return Boolean;
+   function No_Overlaps (pendingRoute, pendingAutoReq : Int_Set_Maps_M.Map) return Boolean
+      with Ghost;
 
    function All_Pending_Requests_Seen
      (pendingRequest : Int_Set_Maps_M.Map;
       routeRequestId : Int64)
-      return Boolean;
+      return Boolean
+   with Ghost;
 
    package UAR_Maps is new SPARK.Containers.Formal.Unbounded_Ordered_Maps
      (Key_Type => Int64,
@@ -679,7 +682,8 @@ private
                      Contains (Int_Set_Maps_M.Get (N, I), E))));
 
    function Disjoint (S1, S2 : Int64_Set) return Boolean is
-     (for all E of S1 => not Contains (S2, E));
+     (for all E of S1 => not Contains (S2, E))
+   with Ghost;
 
    function No_Overlaps (pendingRoute : Int_Set_Maps_M.Map) return Boolean is
      (for all R_1 of pendingRoute =>

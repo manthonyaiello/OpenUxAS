@@ -1,7 +1,7 @@
 // ===============================================================================
 // Authors: AFRL/RQQA
 // Organization: Air Force Research Laboratory, Aerospace Systems Directorate, Power and Control Division
-// 
+//
 // Copyright (c) 2017 Government of the United State of America, as represented by
 // the Secretary of the Air Force.  No copyright is claimed in the United States under
 // Title 17, U.S. Code.  All Other Rights Reserved.
@@ -13,6 +13,7 @@
 #include <SQLiteCpp/Database.h>
 #include <SQLiteCpp/SQLiteCpp.h>
 
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -44,7 +45,7 @@ public:
 
     bool
     configureDatabaseHelper(const std::string& location, bool isTimestamp, const uint32_t statementCountLimit, const std::string& createDatabase, const std::string& databaseTableName, const std::string& databaseTableColumnNames);
-    
+
     bool
     openStream(std::string& logFilePath);
 
@@ -58,10 +59,10 @@ private:
 
     bool
     closeAndOpenStream();
-    
+
     std::string m_location;
     bool m_isTimestamp{true};
-    
+
     std::string m_dbFilePath;
     std::string m_dbFilePathOld;
     std::string m_dbFilePathCloseFailed;
@@ -69,14 +70,14 @@ private:
     uint32_t m_dbStatementCount{1};
     uint32_t m_dbStatementCountLimit{2000};
     uint32_t m_dbFileCloseFailureCount{0};
-    
+
     std::unique_ptr<SQLite::Database> m_db;
     bool m_isTableConfigurationDefined{false};
     bool m_isDbOpened{false};
     std::string m_dbTableCreate;
     std::string m_dbTableName;
     std::string m_dbTableColumnNames;
-    
+
 };
 
 }; //namespace log

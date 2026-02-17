@@ -239,7 +239,8 @@ package body Assignment_Tree_Branch_Bound with SPARK_Mode is
              (Automation_Request,
               Get (TaskPlanOptions_Map, TaskID).Options,
               TaskOpt,
-              EntityId)));
+              EntityId)))
+   with Ghost;
 
    procedure Equal_TaskOpt_Lemma
      (Automation_Request   : UniqueAutomationRequest;

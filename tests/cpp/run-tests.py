@@ -233,18 +233,22 @@ def get_test_uid(path: str) -> str:
                         TEST_DIR)).replace('/', '.').replace('\\', '.')
 
 
-def get_test_list() -> DAG:
+def get_test_list(service_filter=None) -> DAG:
     """Fetch the list of tests and return a DAG.
 
+    :param service_filter: optional service name to filter tests (e.g., 'arv', 'sensor-manager')
     :return: a dag representing the tests to perform.
     """
     test_dag = DAG()
     test_list = find(root=TEST_DIR, pattern='test.py')
 
     for test in test_list:
-        test_dag.add_vertex(
-            get_test_uid(test),
-            data=TestData(uid=get_test_uid(test), test_path=test))
+        test_uid = get_test_uid(test)
+        # If a service filter is provided, only include tests that match
+        if service_filter is None or test_uid.startswith(service_filter + '.'):
+            test_dag.add_vertex(
+                test_uid,
+                data=TestData(uid=test_uid, test_path=test))
     return test_dag
 
 
@@ -254,6 +258,11 @@ def main() -> int:
     :return: 0 in case of success
     """
     m = Main()
+    m.argument_parser.add_argument(
+        'service',
+        nargs='?',
+        default=None,
+        help="optional service name to filter tests (e.g., 'arv', 'sensor-manager')")
     m.argument_parser.add_argument(
         '--source-dir',
         metavar="DIR",
@@ -313,7 +322,7 @@ def main() -> int:
         os.environ['GCOV_PREFIX_STRIP'] = \
             str(len(m.args.source_dir.split(os.sep)) - 1)
 
-    TestsuiteLoop(actions=get_test_list(), jobs=m.args.jobs)
+    TestsuiteLoop(actions=get_test_list(m.args.service), jobs=m.args.jobs)
 
     if (m.args.source_dir is not None and m.args.build_dir is not None
             and len(find(m.args.build_dir, "*.gc*")) > 0):

@@ -104,6 +104,24 @@ class AutomationRequestValidator(object):
         return result
 
 
+class SensorManager(object):
+    """SensorManager service."""
+
+    def __init__(self):
+        pass
+
+    def as_xml(self):
+        """Return service configuration as xml node.
+
+        :return: the xml node for the service configuration
+        :rtype: xml.etree.Element
+        """
+        result = xml_el(
+            'Service',
+            attrib={'Type': 'SensorManagerService'})
+        return result
+
+
 class UxASConfig(object):
     """An UxAS instance configuration."""
 

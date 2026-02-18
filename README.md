@@ -129,6 +129,20 @@ You can run these tests like this:
 
 More information about the C++ tests, including how to develop new tests, is provided in `tests/cpp/README.md`.
 
+#### 3.2.1.1. C++ Tests with Coverage
+
+Coverage results can be obtained from the C++ tests by running the following:
+
+    OpenUxAS$ ./anod build uxas --qualifier=scenario=gcov
+    OpenUxAS$ eval "$( ./anod printenv uxas --qualifier=scenario=gcov )"
+    OpenUxAS$ tests/cpp/run-tests
+
+Note that it *might* be necessary to reset the sandbox first with:
+
+    OpenUxAS$ ./anod reset
+
+There seem to be issues with `serial` and `pugixml` patches failing to apply when the sandbox is not clean
+
 ### 3.2.2. SPARK Proofs
 
 The SPARK proofs can be replayed and compared to prior results using the script found under `tests/proof`, like this:

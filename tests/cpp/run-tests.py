@@ -49,7 +49,10 @@ def dump_gcov_summary(source_dir: str,
 
     # Run gcov to produce de gcov files
     for f in find(root=build_dir, pattern='*.gcno'):
-        cp(f, os.path.join(gcda_dir, os.path.relpath(f, build_dir)))
+        target_path = os.path.join(gcda_dir, os.path.relpath(f, build_dir))
+        # Ensure parent directory exists before copying
+        mkdir(os.path.dirname(target_path), quiet=True)
+        cp(f, target_path)
 
     gcno_files = find(root=gcda_dir, pattern='*.gcno')
 

@@ -158,6 +158,27 @@ cd ../../tests/proof
 
 #### Running with Coverage
 
+The recommended approach is to use the `anod` build system with the gcov qualifier:
+
+```bash
+# From repository root
+# Build UxAS with gcov instrumentation
+./anod build uxas --qualifier=scenario=gcov
+
+# Run tests with gcov instrumentation
+tests/cpp/run-tests --qualifier=scenario=gcov
+```
+
+**Note**: If you encounter issues with patch failures (for `serial` or `pugixml`), you may need to reset the sandbox first:
+
+```bash
+./anod reset
+```
+
+#### Alternative: Building Ada with gcov directly
+
+For Ada-specific coverage, you can also build using gprbuild directly:
+
 ```bash
 # Build Ada with gcov instrumentation
 cd src/ada
@@ -172,9 +193,13 @@ cd ../../src/ada
 gcov objs/gcov/*.gcda
 ```
 
+#### Coverage Metrics
+
 Coverage is measured for:
 - Statement coverage (every line executed)
 - Branch coverage (every decision path taken)
+
+The gcov-instrumented build generates `.gcda` files during test execution, which can be analyzed using gcov to produce coverage reports showing which lines were executed and how many times.
 
 ## Test Infrastructure Details
 

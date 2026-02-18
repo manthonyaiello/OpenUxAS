@@ -27,16 +27,36 @@ RESULT_DIR = os.path.join(ROOT_DIR, 'results')
 sys.path.insert(0, ROOT_DIR)
 
 
+def service_name_to_source_pattern(service_name: str) -> str:
+    """Convert a test service name to a source file pattern.
+
+    :param service_name: the test service name (e.g., 'sensor-manager', 'arv')
+    :return: the source file pattern to match (e.g., 'SensorManagerService', 'AutomationRequestValidatorService')
+    """
+    # Mapping of known test service names to source file patterns
+    service_mapping = {
+        'arv': 'AutomationRequestValidatorService',
+        'sensor-manager': 'SensorManagerService',
+        'assignment-tree': 'AssignmentTreeBranchBound',
+        'automation-diagram': 'AutomationDiagramDataService',
+        'batch-summary': 'BatchSummaryService',
+    }
+
+    return service_mapping.get(service_name, None)
+
+
 def dump_gcov_summary(source_dir: str,
                       build_dir: str,
                       gcda_dir: str,
-                      display_includes_coverage: bool) -> None:
+                      display_includes_coverage: bool,
+                      service_filter: str = None) -> None:
     """Display a coverage summary.
 
     :param source_dir: root source dir
     :param gcda_dir: directory containing the gcda files
     :param display_includes_coverage: if True display coverage summary for
         include files
+    :param service_filter: optional service name to filter coverage results
     :param gcda_files: a list of gcda files to process with gcov
     :param source_files: a list of source files to consider. Coverage
         information about files not in this list will not be displayed.
@@ -60,8 +80,14 @@ def dump_gcov_summary(source_dir: str,
         output=os.path.join(gcr, 'gcov.out'))
     mv(os.path.join(source_dir, '*.gcov'), gcr)
 
+    # Determine the source pattern to filter by
+    source_pattern = None
+    if service_filter:
+        source_pattern = service_name_to_source_pattern(service_filter)
+
     total_sources = 0
     total_covered = 0
+    file_count = 0
 
     for gcov_file in ls(os.path.join(gcr, '*.gcov')):
         # Decode original source paths (-p option of gcov)
@@ -70,6 +96,16 @@ def dump_gcov_summary(source_dir: str,
         # Ignores all source that are not part of the project
         if os.path.isabs(source_file):
             continue
+
+        # Filter by service pattern if specified
+        if source_pattern:
+            # Extract the base filename without extension
+            base_name = os.path.basename(source_file)
+            # Remove extension (.cpp, .h, .hpp)
+            base_name_no_ext = os.path.splitext(base_name)[0]
+            # Check if it matches the service pattern
+            if not base_name_no_ext.startswith(source_pattern):
+                continue
 
         if not display_includes_coverage and \
                 (source_file.endswith('.h') or source_file.endswith('.hpp')):
@@ -90,6 +126,7 @@ def dump_gcov_summary(source_dir: str,
         # Update global counters
         total_sources += total
         total_covered += covered
+        file_count += 1
 
         # Display file information
         if total == 0:
@@ -103,17 +140,18 @@ def dump_gcov_summary(source_dir: str,
                      total,
                      source_file)
 
-    # Display global counters
-    if total_sources == 0:
-        percent = 0.0
-    else:
-        percent = float(total_covered) * 100.0 / float(total_sources)
+    # Display global counters (only if multiple files were processed)
+    if file_count > 1:
+        if total_sources == 0:
+            percent = 0.0
+        else:
+            percent = float(total_covered) * 100.0 / float(total_sources)
 
-    logging.info('%6.2f %% %8d/%-8d %s',
-                 float(total_covered) * 100.0 / float(total_sources),
-                 total_covered,
-                 total_sources,
-                 'TOTAL')
+        logging.info('%6.2f %% %8d/%-8d %s',
+                     float(total_covered) * 100.0 / float(total_sources),
+                     total_covered,
+                     total_sources,
+                     'TOTAL')
 
 
 class TestJob(ProcessJob):
@@ -329,10 +367,14 @@ def main() -> int:
 
     if (m.args.source_dir is not None and m.args.build_dir is not None
             and len(find(m.args.build_dir, "*.gc*")) > 0):
+        # When a single service is specified, automatically show .h files
+        # unless explicitly disabled
+        show_includes = m.args.display_includes_coverage or (m.args.service is not None)
         dump_gcov_summary(m.args.source_dir,
                           m.args.build_dir,
                           gcda_dir,
-                          m.args.display_includes_coverage)
+                          show_includes,
+                          m.args.service)
 
     return 0
 

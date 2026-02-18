@@ -134,8 +134,7 @@ More information about the C++ tests, including how to develop new tests, is pro
 Coverage results can be obtained from the C++ tests by running the following:
 
     OpenUxAS$ ./anod build uxas --qualifier=scenario=gcov
-    OpenUxAS$ eval "$( ./anod printenv uxas --qualifier=scenario=gcov )"
-    OpenUxAS$ tests/cpp/run-tests
+    OpenUxAS$ tests/cpp/run-tests --qualifier=scenario=gcov
 
 Note that it *might* be necessary to reset the sandbox first with:
 

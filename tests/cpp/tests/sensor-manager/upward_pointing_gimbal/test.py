@@ -3,36 +3,36 @@ from pylmcp import Object
 from pylmcp.server import Server
 from pylmcp.uxas import SensorManager, UxASConfig
 
-# Test REQ-SENS-018: Discrete FOV Mode Handling
-# Tests that when a camera's FieldOfViewMode is Discrete, the service
-# uses the DiscreteHorizontalFieldOfViewList for FOV values
+# Test REQ-ERR-006: Upward-Pointing Gimbal Rejection
+# Tests that when a gimbal's minimum elevation is >= 0 (pointing at or above horizontal),
+# the service skips that gimbal and outputs a warning message
 
 bridge_cfg = UxASConfig()
 bridge_cfg += SensorManager()
 
 with Server(bridge_cfg=bridge_cfg) as server:
     try:
-        # Send configuration with discrete FOV camera
+        # Send configuration with upward-pointing gimbal
         gimbal = Object(
             class_name='GimbalConfiguration',
             PayloadID=10,
-            MinElevation=-80.0,
-            MaxElevation=-20.0,
+            MinElevation=10.0,   # Positive angle (pointing upward)
+            MaxElevation=45.0,   # Pointing upward
             IsElevationClamped=True,
             ContainedPayloadList=[20],
             randomize=True
         )
 
-        # Camera with discrete FOV values
-        # Note: C++ enum FOVOperationMode::Continuous=0, FOVOperationMode::Discrete=1
         camera = Object(
             class_name='CameraConfiguration',
             PayloadID=20,
+            MinHorizontalFieldOfView=10.0,
+            MaxHorizontalFieldOfView=30.0,
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
-            SupportedWavelengthBand=1,
-            FieldOfViewMode=1,  # Discrete (C++ FOVOperationMode::Discrete=1)
-            DiscreteHorizontalFieldOfViewList=[15.0, 30.0, 60.0],  # Three discrete values
+            SupportedWavelengthBand=1,  # EO
+            FieldOfViewMode=1,  # Discrete
+            DiscreteHorizontalFieldOfViewList=[15.0, 20.0],
             randomize=True
         )
 
@@ -47,9 +47,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
         server.send_msg(vehicle_config)
         time.sleep(0.2)
 
-        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop so the
-        # Discrete FOV branch (lines 285-287) actually executes and reads
-        # DiscreteHorizontalFieldOfViewList. Without it, the loop is skipped entirely.
+        # Request footprint - should get empty response since gimbal cannot point down
         footprint_request = Object(
             class_name='task.FootprintRequest',
             FootprintRequestID=1,
@@ -57,7 +55,6 @@ with Server(bridge_cfg=bridge_cfg) as server:
             EligibleWavelengths=[1],
             GroundSampleDistances=[5.0],
             AglAltitudes=[1000.0],
-            ElevationAngles=[-45.0],
             randomize=True
         )
 
@@ -77,16 +74,16 @@ with Server(bridge_cfg=bridge_cfg) as server:
 
         assert msg.descriptor == "uxas.messages.task.SensorFootprintResponse"
         footprints = msg.obj['Footprints']
-        assert len(footprints) > 0, "Should have footprint objects in response"
 
-        # With a valid elevation angle, the GSD loop executes and the Discrete FOV
-        # path is taken. Verify the selected FOV came from the discrete list.
-        fp = footprints[0]
-        assert fp['AchievedGSD'] > 0, \
-            f"AchievedGSD {fp['AchievedGSD']} should be positive (Discrete FOV found)"
-        assert fp['HorizontalFOV'] in {15.0, 30.0, 60.0}, \
-            f"HorizontalFOV {fp['HorizontalFOV']} should be from the discrete list"
+        # The service always creates one footprint object per parameter combination,
+        # even when no valid sensor is found. With an upward-pointing gimbal, the
+        # service outputs a warning (lines 333-336) and skips the GSD loop, leaving
+        # AchievedGSD at the default value of 0.0.
+        assert len(footprints) > 0, "Service should return footprint objects"
+        for fp in footprints:
+            assert fp['AchievedGSD'] == 0.0, \
+                f"AchievedGSD {fp['AchievedGSD']} should be 0.0 (no sensor found for upward-pointing gimbal)"
 
         print("OK")
     finally:
-        print("Here")
+        pass

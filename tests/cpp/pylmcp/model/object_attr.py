@@ -59,7 +59,16 @@ class ObjectAttr(object):
                 else:
                     result += struct.pack("B", value is not None)
                     if value is not None:
-                        result += model.pack(value, include_headers=False)
+                        if hasattr(value, 'object_class') and hasattr(value, 'data'):
+                            # Use the actual runtime type for polymorphic objects,
+                            # not the declared base type. This ensures the type ID
+                            # in the binary matches the concrete subclass (e.g.
+                            # GimbalConfiguration vs PayloadConfiguration) so the
+                            # C++ LMCP deserializer creates the correct runtime type.
+                            result += value.object_class.pack(value.data,
+                                                              include_headers=False)
+                        else:
+                            result += model.pack(value, include_headers=False)
             return result
 
         if self.is_array:

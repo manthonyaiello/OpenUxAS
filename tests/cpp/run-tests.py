@@ -7,7 +7,7 @@ import socket
 from queue import Queue
 
 from e3.main import Main
-from e3.fs import find, rm, mkdir, cp, ls, mv
+from e3.fs import find, rm, mkdir, cp, ls
 from e3.os.fs import which
 from e3.collection.dag import DAG
 from e3.job.walk import Walk
@@ -76,9 +76,45 @@ def dump_gcov_summary(source_dir: str,
 
     gcno_files = find(root=gcda_dir, pattern='*.gcno')
 
+    gcov_out = os.path.join(gcr, 'gcov.out')
+
+    # Run gcov from source_dir so it can resolve relative source paths
+    # (e.g. "src/cpp/..." embedded in the gcno files).  The *.gcov output
+    # files land in source_dir and are moved to gcr afterwards.
+    # ENABLE_GCOV=1 is required when the GNAT gcov wrapper is on the PATH.
     Run(['gcov', '-p'] + gcno_files, cwd=source_dir,
-        output=os.path.join(gcr, 'gcov.out'))
-    mv(os.path.join(source_dir, '*.gcov'), gcr)
+        env={'ENABLE_GCOV': '1'},
+        output=gcov_out)
+
+    # Detect gcov version mismatch: if the gcno/gcda files were produced by a
+    # different GCC than the gcov on the PATH, gcov emits warnings of the form
+    # "version 'B52 ', prefer 'B33*'" and generates only stub output files.
+    version_mismatch = re.compile(r"version '[^']+', prefer ")
+    with open(gcov_out) as fd:
+        for line in fd:
+            if version_mismatch.search(line):
+                # Clean up any stub files left in source_dir before exiting.
+                for f in ls(os.path.join(source_dir, '*.gcov')):
+                    rm(f)
+                gcov_path = which('gcov') or 'gcov'
+                logging.critical(
+                    "gcov version mismatch detected.\n"
+                    "  gcov in use : %s\n"
+                    "  gcov output : %s\n\n"
+                    "The gcov resolved from your PATH (%s) does not match the "
+                    "GCC version used to build OpenUxAS with coverage "
+                    "instrumentation.  Please ensure that you launch this "
+                    "script with the same compiler environment that was used "
+                    "during the build (e.g. run 'ensure_gnat' or add the "
+                    "correct toolchain to your PATH before running run-tests).",
+                    gcov_path, gcov_out, gcov_path)
+                raise SystemExit(1)
+
+    # Move gcov output files from source_dir to gcr.  Using an explicit loop
+    # over ls() is safe when no files match (unlike a shell mv glob).
+    for f in ls(os.path.join(source_dir, '*.gcov')):
+        cp(f, gcr)
+        rm(f)
 
     # Determine the source pattern to filter by
     source_pattern = None
@@ -148,7 +184,7 @@ def dump_gcov_summary(source_dir: str,
             percent = float(total_covered) * 100.0 / float(total_sources)
 
         logging.info('%6.2f %% %8d/%-8d %s',
-                     float(total_covered) * 100.0 / float(total_sources),
+                     percent,
                      total_covered,
                      total_sources,
                      'TOTAL')

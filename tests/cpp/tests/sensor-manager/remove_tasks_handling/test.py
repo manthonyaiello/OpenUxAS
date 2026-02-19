@@ -3,16 +3,16 @@ from pylmcp import Object
 from pylmcp.server import Server
 from pylmcp.uxas import SensorManager, UxASConfig
 
-# Test REQ-SENS-018: Discrete FOV Mode Handling
-# Tests that when a camera's FieldOfViewMode is Discrete, the service
-# uses the DiscreteHorizontalFieldOfViewList for FOV values
+# Test REQ-PROC-012: RemoveTasks Message Subscription and Handling
+# Tests that the service subscribes to RemoveTasks messages but silently ignores them
+# without generating errors or affecting ongoing operations
 
 bridge_cfg = UxASConfig()
 bridge_cfg += SensorManager()
 
 with Server(bridge_cfg=bridge_cfg) as server:
     try:
-        # Send configuration with discrete FOV camera
+        # Send vehicle configuration
         gimbal = Object(
             class_name='GimbalConfiguration',
             PayloadID=10,
@@ -23,16 +23,16 @@ with Server(bridge_cfg=bridge_cfg) as server:
             randomize=True
         )
 
-        # Camera with discrete FOV values
-        # Note: C++ enum FOVOperationMode::Continuous=0, FOVOperationMode::Discrete=1
         camera = Object(
             class_name='CameraConfiguration',
             PayloadID=20,
+            MinHorizontalFieldOfView=10.0,
+            MaxHorizontalFieldOfView=30.0,
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
             SupportedWavelengthBand=1,
-            FieldOfViewMode=1,  # Discrete (C++ FOVOperationMode::Discrete=1)
-            DiscreteHorizontalFieldOfViewList=[15.0, 30.0, 60.0],  # Three discrete values
+            FieldOfViewMode=1,
+            DiscreteHorizontalFieldOfViewList=[15.0, 20.0],
             randomize=True
         )
 
@@ -47,9 +47,17 @@ with Server(bridge_cfg=bridge_cfg) as server:
         server.send_msg(vehicle_config)
         time.sleep(0.2)
 
-        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop so the
-        # Discrete FOV branch (lines 285-287) actually executes and reads
-        # DiscreteHorizontalFieldOfViewList. Without it, the loop is skipped entirely.
+        # Send a RemoveTasks message - should be silently ignored
+        remove_tasks = Object(
+            class_name='RemoveTasks',
+            TaskList=[1, 2, 3],
+            randomize=True
+        )
+
+        server.send_msg(remove_tasks)
+        time.sleep(0.2)
+
+        # Now send a normal footprint request - should work normally
         footprint_request = Object(
             class_name='task.FootprintRequest',
             FootprintRequestID=1,
@@ -57,7 +65,6 @@ with Server(bridge_cfg=bridge_cfg) as server:
             EligibleWavelengths=[1],
             GroundSampleDistances=[5.0],
             AglAltitudes=[1000.0],
-            ElevationAngles=[-45.0],
             randomize=True
         )
 
@@ -77,16 +84,10 @@ with Server(bridge_cfg=bridge_cfg) as server:
 
         assert msg.descriptor == "uxas.messages.task.SensorFootprintResponse"
         footprints = msg.obj['Footprints']
-        assert len(footprints) > 0, "Should have footprint objects in response"
 
-        # With a valid elevation angle, the GSD loop executes and the Discrete FOV
-        # path is taken. Verify the selected FOV came from the discrete list.
-        fp = footprints[0]
-        assert fp['AchievedGSD'] > 0, \
-            f"AchievedGSD {fp['AchievedGSD']} should be positive (Discrete FOV found)"
-        assert fp['HorizontalFOV'] in {15.0, 30.0, 60.0}, \
-            f"HorizontalFOV {fp['HorizontalFOV']} should be from the discrete list"
+        # Should receive normal response - RemoveTasks was silently ignored
+        assert len(footprints) > 0, "Should generate footprints normally after RemoveTasks"
 
         print("OK")
     finally:
-        print("Here")
+        pass

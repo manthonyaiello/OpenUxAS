@@ -92,7 +92,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             ]
 
             for field in required_fields:
-                assert field in fp, f"Missing required field: {field}"
+                assert field in fp.data, f"Missing required field: {field}"
                 value = fp[field]
                 assert value >= 0, f"{field} should be non-negative, got {value}"
 

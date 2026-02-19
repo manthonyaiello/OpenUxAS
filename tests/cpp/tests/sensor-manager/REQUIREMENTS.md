@@ -90,6 +90,9 @@ The service SHALL set the VehicleID in each SensorFootprint to match the entity 
 ### REQ-PROC-011: Response Transmission
 After processing all requests, the service SHALL broadcast a SensorFootprintResponse message containing all generated footprints.
 
+### REQ-PROC-012: RemoveTasks Message Subscription and Handling
+The service SHALL subscribe to afrl::cmasi::RemoveTasks messages but SHALL silently ignore them without generating errors or affecting ongoing operations.
+
 ## 5. Sensor Selection Requirements
 
 ### REQ-SENS-001: Minimum Altitude Check
@@ -150,7 +153,16 @@ When a camera's FieldOfViewMode is Discrete, the service SHALL use the DiscreteH
 When a camera's FieldOfViewMode is Continuous, the service SHALL generate FOV values from MinHorizontalFieldOfView to MaxHorizontalFieldOfView in steps of HORIZANTAL_FOV_STEP_SIZE_DEG (5.0 degrees).
 
 ### REQ-SENS-020: Unknown FOV Mode Error
-When a camera's FieldOfViewMode is neither Discrete nor Continuous, the service SHALL output an error message.
+When a camera's FieldOfViewMode is neither Discrete nor Continuous, the service SHALL output an error message and skip processing that camera.
+
+### REQ-SENS-021: Extreme Elevation Angle Lower Bound Clamping
+The service SHALL clamp gimbal minimum elevation to at most -π + 1 degree (in radians) to prevent edge cases in trigonometric calculations.
+
+### REQ-SENS-022: Elevation Range Consistency Check
+If after clamping the maximum elevation is less than the minimum elevation, the service SHALL set maximum equal to minimum to maintain range validity.
+
+### REQ-SENS-023: Zero Resolution Fallback
+If a camera's minimum video stream resolution is zero or negative, the service SHALL use π/2 as the angular resolution to represent worst-case scenario.
 
 ## 6. GSD (Ground Sample Distance) Calculation Requirements
 
@@ -183,6 +195,9 @@ The service SHALL initialize the AchievedGSD field to 0.0 before sensor selectio
 
 ### REQ-GSD-010: Final GSD Storage
 The service SHALL store the achieved GSD in the SensorFootprint's AchievedGSD field.
+
+### REQ-GSD-011: Multiple Candidate Evaluation
+When evaluating multiple gimbal angle and FOV combinations, the service SHALL only update the selected sensor configuration when a new combination produces a GSD closer to the desired GSD than the current best match.
 
 ## 7. Footprint Geometric Calculation Requirements
 
@@ -304,6 +319,15 @@ Messages that are not EntityConfiguration or SensorFootprintRequests SHALL be si
 
 ### REQ-ERR-004: Safe Degradation
 When errors are encountered, the service SHALL continue processing remaining requests rather than terminating.
+
+### REQ-ERR-005: Unclamped Gimbal Constraint
+When a gimbal's IsElevationClamped flag is false (360-degree rotation capable), the service SHALL constrain the elevation range to [-π + 1 degree, -1 degree] in radians to ensure the sensor points toward the ground.
+
+### REQ-ERR-006: Upward-Pointing Gimbal Rejection
+When a gimbal's minimum elevation angle is >= 0 (pointing at or above horizontal after clamping), the service SHALL skip that gimbal without generating footprints and SHALL output a warning message including the gimbal ID and elevation angle.
+
+### REQ-ERR-007: Invalid FOV Mode Handling
+When a camera's FieldOfViewMode is neither Discrete (value 1) nor Continuous (value 2), the service SHALL output an error message with the mode value and skip that camera without generating footprints.
 
 ## 11. Configuration Constants Requirements
 

@@ -3,16 +3,16 @@ from pylmcp import Object
 from pylmcp.server import Server
 from pylmcp.uxas import SensorManager, UxASConfig
 
-# Test REQ-SENS-018: Discrete FOV Mode Handling
-# Tests that when a camera's FieldOfViewMode is Discrete, the service
-# uses the DiscreteHorizontalFieldOfViewList for FOV values
+# Test REQ-SENS-023: Zero Resolution Fallback
+# Tests that if a camera's video stream resolution is zero or negative,
+# the service uses π/2 as the angular resolution (worst case)
 
 bridge_cfg = UxASConfig()
 bridge_cfg += SensorManager()
 
 with Server(bridge_cfg=bridge_cfg) as server:
     try:
-        # Send configuration with discrete FOV camera
+        # Test with camera having zero resolution
         gimbal = Object(
             class_name='GimbalConfiguration',
             PayloadID=10,
@@ -23,16 +23,17 @@ with Server(bridge_cfg=bridge_cfg) as server:
             randomize=True
         )
 
-        # Camera with discrete FOV values
-        # Note: C++ enum FOVOperationMode::Continuous=0, FOVOperationMode::Discrete=1
+        # Camera with zero resolution values
         camera = Object(
             class_name='CameraConfiguration',
             PayloadID=20,
-            VideoStreamHorizontalResolution=1920,
-            VideoStreamVerticalResolution=1080,
+            MinHorizontalFieldOfView=10.0,
+            MaxHorizontalFieldOfView=30.0,
+            VideoStreamHorizontalResolution=0,  # Zero resolution
+            VideoStreamVerticalResolution=0,    # Zero resolution
             SupportedWavelengthBand=1,
-            FieldOfViewMode=1,  # Discrete (C++ FOVOperationMode::Discrete=1)
-            DiscreteHorizontalFieldOfViewList=[15.0, 30.0, 60.0],  # Three discrete values
+            FieldOfViewMode=1,
+            DiscreteHorizontalFieldOfViewList=[15.0, 20.0],
             randomize=True
         )
 
@@ -47,9 +48,10 @@ with Server(bridge_cfg=bridge_cfg) as server:
         server.send_msg(vehicle_config)
         time.sleep(0.2)
 
-        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop so the
-        # Discrete FOV branch (lines 285-287) actually executes and reads
-        # DiscreteHorizontalFieldOfViewList. Without it, the loop is skipped entirely.
+        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop.
+        # Only once inside the loop does the zero-resolution fallback at line 306
+        # (alpha = π/2) execute. GSD = slantRange × sin(π/2) = slantRange, which is
+        # a large positive value.
         footprint_request = Object(
             class_name='task.FootprintRequest',
             FootprintRequestID=1,
@@ -77,16 +79,17 @@ with Server(bridge_cfg=bridge_cfg) as server:
 
         assert msg.descriptor == "uxas.messages.task.SensorFootprintResponse"
         footprints = msg.obj['Footprints']
-        assert len(footprints) > 0, "Should have footprint objects in response"
 
-        # With a valid elevation angle, the GSD loop executes and the Discrete FOV
-        # path is taken. Verify the selected FOV came from the discrete list.
-        fp = footprints[0]
-        assert fp['AchievedGSD'] > 0, \
-            f"AchievedGSD {fp['AchievedGSD']} should be positive (Discrete FOV found)"
-        assert fp['HorizontalFOV'] in {15.0, 30.0, 60.0}, \
-            f"HorizontalFOV {fp['HorizontalFOV']} should be from the discrete list"
+        # Should still generate footprints using worst-case angular resolution
+        assert len(footprints) > 0, "Should generate footprints even with zero resolution"
+
+        # Verify that footprints have valid GSD values (will be large due to worst-case resolution)
+        for fp in footprints:
+            gsd = fp['AchievedGSD']
+            assert gsd > 0, f"Achieved GSD {gsd} should be positive"
+            # With π/2 angular resolution, GSD will be very large (worst case)
+            # Just verify it's computed, not necessarily a specific value
 
         print("OK")
     finally:
-        print("Here")
+        pass

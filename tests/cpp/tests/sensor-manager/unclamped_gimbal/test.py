@@ -3,36 +3,37 @@ from pylmcp import Object
 from pylmcp.server import Server
 from pylmcp.uxas import SensorManager, UxASConfig
 
-# Test REQ-SENS-018: Discrete FOV Mode Handling
-# Tests that when a camera's FieldOfViewMode is Discrete, the service
-# uses the DiscreteHorizontalFieldOfViewList for FOV values
+# Test REQ-ERR-005: Unclamped Gimbal Constraint
+# Tests that when a gimbal's IsElevationClamped flag is false (360-degree rotation),
+# the service constrains the elevation range to [-π + 1°, -1°] before applying the
+# requested elevation angle.
 
 bridge_cfg = UxASConfig()
 bridge_cfg += SensorManager()
 
 with Server(bridge_cfg=bridge_cfg) as server:
     try:
-        # Send configuration with discrete FOV camera
+        # Configure a gimbal with IsElevationClamped=False (360-degree rotation capable).
+        # The configured min/max are irrelevant — the service overrides them.
         gimbal = Object(
             class_name='GimbalConfiguration',
             PayloadID=10,
-            MinElevation=-80.0,
-            MaxElevation=-20.0,
-            IsElevationClamped=True,
+            MinElevation=-180.0,
+            MaxElevation=180.0,
+            IsElevationClamped=False,  # KEY: 360-degree rotation
             ContainedPayloadList=[20],
             randomize=True
         )
 
-        # Camera with discrete FOV values
-        # Note: C++ enum FOVOperationMode::Continuous=0, FOVOperationMode::Discrete=1
         camera = Object(
             class_name='CameraConfiguration',
             PayloadID=20,
+            MinHorizontalFieldOfView=10.0,
+            MaxHorizontalFieldOfView=30.0,
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
-            SupportedWavelengthBand=1,
-            FieldOfViewMode=1,  # Discrete (C++ FOVOperationMode::Discrete=1)
-            DiscreteHorizontalFieldOfViewList=[15.0, 30.0, 60.0],  # Three discrete values
+            SupportedWavelengthBand=1,  # EO
+            FieldOfViewMode=1,  # Continuous
             randomize=True
         )
 
@@ -47,9 +48,9 @@ with Server(bridge_cfg=bridge_cfg) as server:
         server.send_msg(vehicle_config)
         time.sleep(0.2)
 
-        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop so the
-        # Discrete FOV branch (lines 285-287) actually executes and reads
-        # DiscreteHorizontalFieldOfViewList. Without it, the loop is skipped entirely.
+        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop.
+        # With an unclamped gimbal, the service first sets the range to [-179°, -1°]
+        # (lines 249-250), then pins to -45° because -45 is within that range.
         footprint_request = Object(
             class_name='task.FootprintRequest',
             FootprintRequestID=1,
@@ -79,14 +80,14 @@ with Server(bridge_cfg=bridge_cfg) as server:
         footprints = msg.obj['Footprints']
         assert len(footprints) > 0, "Should have footprint objects in response"
 
-        # With a valid elevation angle, the GSD loop executes and the Discrete FOV
-        # path is taken. Verify the selected FOV came from the discrete list.
+        # A valid sensor should have been found: the unclamped gimbal allows -45°
+        # (which is within the constrained range [-179°, -1°]).
         fp = footprints[0]
         assert fp['AchievedGSD'] > 0, \
-            f"AchievedGSD {fp['AchievedGSD']} should be positive (Discrete FOV found)"
-        assert fp['HorizontalFOV'] in {15.0, 30.0, 60.0}, \
-            f"HorizontalFOV {fp['HorizontalFOV']} should be from the discrete list"
+            f"AchievedGSD {fp['AchievedGSD']} should be positive (sensor found)"
+        assert fp['GimbalElevation'] != 0.0, \
+            f"GimbalElevation should not be 0.0 (default) when sensor is found"
 
         print("OK")
     finally:
-        print("Here")
+        pass

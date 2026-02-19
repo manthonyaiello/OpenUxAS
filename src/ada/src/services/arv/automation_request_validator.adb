@@ -1,11 +1,15 @@
 with SPARK.Big_Integers;         use SPARK.Big_Integers;
+with Ada.Characters.Latin_1;
 with Ada.Containers;             use Ada.Containers;
 with AVTAS.LMCP.Types;
+with Int64_Parsing;              use Int64_Parsing;
 with UxAS.Comms.LMCP_Net_Client; use UxAS.Comms.LMCP_Net_Client;
 
 package body Automation_Request_Validator with SPARK_Mode is
 
    use Common.Count_Type_To_Big_Integer_Conversions;
+
+   LF : constant Character := Ada.Characters.Latin_1.LF;
 
    -----------------------
    -- Local Subprograms --
@@ -82,7 +86,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       ReasonForFailure : Unbounded_String :=
         To_Unbounded_String
           ("Automation Request ID["
-           & Int64'Image (Request.RequestID) & "] Not Ready ::");
+           & Print_Int64 (Request.RequestID) & "] Not Ready ::" & LF);
       EntityList : Int64_Seq;
    begin
       IsReady := True;
@@ -155,8 +159,8 @@ package body Automation_Request_Validator with SPARK_Mode is
                   begin
                      if not Contains (Configurations, Id) then
                         Append_To_Msg (Msg  => ReasonForFailure,
-                                       Tail => String'("- EntityConfiguration for Entity Id["
-                                         & Int64'Image (Id) & "] not available."));
+                                       Tail => "- EntityConfiguration for Entity Id["
+                                         & Print_Int64 (Id) & "] not available." & LF);
                         IsReady := False;
                      end if;
 
@@ -170,7 +174,7 @@ package body Automation_Request_Validator with SPARK_Mode is
             end if;
          else
             Append_To_Msg (Msg  => ReasonForFailure,
-                           Tail => "- No EntityConfigurations available.");
+                           Tail => "- No EntityConfigurations available." & LF);
             IsReady := False;
          end if;
 
@@ -215,13 +219,13 @@ package body Automation_Request_Validator with SPARK_Mode is
                      IsReady := False;
                      Append_To_Msg (Msg  => ReasonForFailure,
                                     Tail => "- EntityState for Entity Id["
-                                    & Int64'Image (Id) & "] not available.");
+                                    & Print_Int64 (Id) & "] not available." & LF);
                   end if;
                end;
             end loop;
          else
             Append_To_Msg (Msg  => ReasonForFailure,
-                           Tail => "- No EntityStates available.");
+                           Tail => "- No EntityStates available." & LF);
             IsReady := False;
             pragma Assert
               (not Check_For_Required_Entity_Configurations
@@ -259,17 +263,17 @@ package body Automation_Request_Validator with SPARK_Mode is
                if not IsFoundAMatch then
                   Append_To_Msg (Msg  => ReasonForFailure,
                                  Tail => "- No EntityStates that match EntityConfigurations"
-                                 & " are available.");
+                                 & " are available." & LF);
                   IsReady := False;
                end if;
             end;
          else
             if Is_Empty (Configurations) then
                Append_To_Msg (Msg  => ReasonForFailure,
-                              Tail => "- No EntityConfigurations available.");
+                              Tail => "- No EntityConfigurations available." & LF);
             else
                Append_To_Msg (Msg  => ReasonForFailure,
-                              Tail => "- No EntityStates available.");
+                              Tail => "- No EntityStates available." & LF);
             end if;
             IsReady := False;
          end if;
@@ -304,7 +308,7 @@ package body Automation_Request_Validator with SPARK_Mode is
                      if not Contains (KeepIn_Zones_Ids, KeepInArea) then
                         Append_To_Msg (Msg  => ReasonForFailure,
                                        Tail => "- KeepInArea Id["
-                                       & Int64'Image (KeepInArea) & "] not available.");
+                                       & Print_Int64 (KeepInArea) & "] not available." & LF);
                         IsReady := False;
                      end if;
 
@@ -322,7 +326,7 @@ package body Automation_Request_Validator with SPARK_Mode is
                      if not Contains (KeepOut_Zones_Ids, KeepOutArea) then
                         Append_To_Msg (Msg  => ReasonForFailure,
                                 Tail => "- KeepOutArea Id["
-                                & Int64'Image (KeepOutArea) & "] not available.");
+                                & Print_Int64 (KeepOutArea) & "] not available." & LF);
                         IsReady := False;
                      end if;
                      pragma Loop_Invariant
@@ -336,8 +340,8 @@ package body Automation_Request_Validator with SPARK_Mode is
          else
             Append_To_Msg (Msg  => ReasonForFailure,
                            Tail => "- OperatingRegion Id["
-                           & Int64'Image (Operating_Region)
-                           & "] not available.");
+                           & Print_Int64 (Operating_Region)
+                           & "] not available." & LF);
             IsReady := False;
          end if;
       end if;
@@ -387,8 +391,8 @@ package body Automation_Request_Validator with SPARK_Mode is
                         then
                            Append_To_Msg (Msg  => ReasonForFailure,
                                           Tail => "- AreaOfInterest Id["
-                                          & Int64'Image (ItTask.SearchAreaID)
-                                          & "] not available.");
+                                          & Print_Int64 (ItTask.SearchAreaID)
+                                          & "] not available." & LF);
                            IsReady := False;
                         end if;
                      end if;
@@ -399,8 +403,8 @@ package body Automation_Request_Validator with SPARK_Mode is
                         then
                            Append_To_Msg (Msg  => ReasonForFailure,
                                           Tail => "- LineOfInterest Id["
-                                          & Int64'Image (ItTask.LineID)
-                                          & "] not available.");
+                                          & Print_Int64 (ItTask.LineID)
+                                          & "] not available." & LF);
                            IsReady := False;
                         end if;
                      end if;
@@ -412,8 +416,8 @@ package body Automation_Request_Validator with SPARK_Mode is
                            Append_To_Msg (Msg  => ReasonForFailure,
                                           --  Point of interest ??
                                           Tail => "- LineOfInterest Id["
-                                          & Int64'Image (ItTask.SearchLocationID)
-                                          & "] not available.");
+                                          & Print_Int64 (ItTask.SearchLocationID)
+                                          & "] not available." & LF);
                            IsReady := False;
                         end if;
                      end if;
@@ -422,8 +426,8 @@ package body Automation_Request_Validator with SPARK_Mode is
             else
                pragma Assert (not Has_Key (Available_Tasks, TaskId));
                Append_To_Msg (Msg  => ReasonForFailure,
-                              Tail => "- Task with the Id[" & Int64'Image (TaskId)
-                              & "] is unknown. Ensure task description preceeds automation request.");
+                              Tail => "- Task with the Id[" & Print_Int64 (TaskId)
+                              & "] is unknown. Ensure task description preceeds automation request." & LF);
                IsReady := False;
             end if;
          end;
@@ -487,6 +491,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       Unique_Automation_Request.OperatingRegion := Request.OperatingRegion;
       Unique_Automation_Request.TaskList := Request.TaskList;
       Unique_Automation_Request.TaskRelationships := Request.TaskRelationships;
+      Unique_Automation_Request.RedoAllTasks := Request.RedoAllTasks;
 
       State.Sandbox := Add (State.Sandbox, ReqId, Details);
 

@@ -21,7 +21,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
                     Object(class_name='KeepInZone', ZoneID=1,
                            randomize=True),
                     Object(class_name='KeepOutZone', ZoneID=2,
-                           randomize=True),
+                           ZoneType=1, randomize=True),
                     Object(class_name='OperatingRegion', ID=3,
                            KeepInAreas=[1], KeepOutAreas=[2]),
                     Object(class_name='ImpactPointSearchTask', TaskID=1000,

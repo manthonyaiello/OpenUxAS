@@ -172,19 +172,30 @@ class UxAS(object):
     def __init__(self,
                  entity_id,
                  entity_type='Aircraft',
-                 uxas_bin=None):
+                 uxas_bin=None,
+                 impl=None):
         """Initialize an UxAS instance.
 
         :param entity_id: the entity id
         :type entity_id: str
         :param entity_type: the entity type
         :type entity_type: str
-        :param uxas_bin: location of the uxas executable. If None try to find
-            uxas on the path.
+        :param uxas_bin: location of the uxas executable. If None, the
+            executable is found based on the impl parameter.
         :type uxas_bin: str | None
+        :param impl: which implementation to use: 'cpp' (default) or 'ada'.
+            If None, reads the UXAS_IMPL environment variable, falling back
+            to 'cpp'. When 'ada', uses the UXAS_ADA_BIN environment variable
+            or searches for 'uxas-ada' on the PATH.
+        :type impl: str | None
         """
+        if impl is None:
+            impl = os.environ.get('UXAS_IMPL', 'cpp')
         if uxas_bin is None:
-            self.uxas_bin = which('uxas')
+            if impl == 'ada':
+                self.uxas_bin = os.environ.get('UXAS_ADA_BIN') or which('uxas-ada')
+            else:
+                self.uxas_bin = which('uxas')
         else:
             self.uxas_bin = uxas_bin
 

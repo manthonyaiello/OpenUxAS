@@ -195,6 +195,9 @@ class TestJob(ProcessJob):
 
     PORTS: Queue = Queue()
 
+    # Set to True when --impl=both so that 4 ports are reserved per job.
+    BACK_TO_BACK: bool = False
+
     @property
     def cmdline(self):
         """See e3.job.ProcessJob."""
@@ -205,24 +208,44 @@ class TestJob(ProcessJob):
                      self.queue_name, 'start', 0, self.data)
         self.in_port = self.PORTS.get()
         self.out_port = self.PORTS.get()
-        logging.debug('Reserve ports: %s, %s', self.in_port, self.out_port)
+        if TestJob.BACK_TO_BACK:
+            self.challenger_in_port = self.PORTS.get()
+            self.challenger_out_port = self.PORTS.get()
+            logging.debug('Reserve ports: %s, %s, %s, %s',
+                          self.in_port, self.out_port,
+                          self.challenger_in_port, self.challenger_out_port)
+        else:
+            self.challenger_in_port = None
+            self.challenger_out_port = None
+            logging.debug('Reserve ports: %s, %s', self.in_port, self.out_port)
 
     def on_finish(self, scheduler):
         self.PORTS.put(self.in_port)
         self.PORTS.put(self.out_port)
-        logging.debug('Release ports: %s, %s', self.in_port, self.out_port)
+        if TestJob.BACK_TO_BACK:
+            self.PORTS.put(self.challenger_in_port)
+            self.PORTS.put(self.challenger_out_port)
+            logging.debug('Release ports: %s, %s, %s, %s',
+                          self.in_port, self.out_port,
+                          self.challenger_in_port, self.challenger_out_port)
+        else:
+            logging.debug('Release ports: %s, %s', self.in_port, self.out_port)
 
     @property
     def cmd_options(self):
         """See e3.job.ProcessJob."""
-
-        # Compute the default urls used by the bridge
+        env = {
+            'IN_SERVER_URL': 'tcp://127.0.0.1:%s' % self.in_port,
+            'OUT_SERVER_URL': 'tcp://127.0.0.1:%s' % self.out_port,
+        }
+        if TestJob.BACK_TO_BACK:
+            env['CHALLENGER_OUT_URL'] = (
+                'tcp://127.0.0.1:%s' % self.challenger_in_port)
+            env['CHALLENGER_IN_URL'] = (
+                'tcp://127.0.0.1:%s' % self.challenger_out_port)
         return {'output': os.path.join(RESULT_DIR, self.uid + '.out'),
                 'ignore_environ': False,
-                'env': {'IN_SERVER_URL':
-                        'tcp://127.0.0.1:%s' % self.in_port,
-                        'OUT_SERVER_URL':
-                        'tcp://127.0.0.1:%s' % self.out_port}}
+                'env': env}
 
 
 class TestData(object):
@@ -288,12 +311,10 @@ class TestsuiteLoop(Walk):
         super(TestsuiteLoop, self).set_scheduling_params()
         self.tokens = self.jobs
 
-        for _ in range(self.jobs * 4):
-            # For each worker we allocate 4 ports. Each job will use 2 ports.
-            # By allocating twice the necessary number we ensure that ports
-            # are not reused immediatly. This ensure that the system has time
-            # to release the port once the process using it is finished and
-            # thus avoid "Port in used" errors
+        # For back-to-back mode each job needs 4 ports (2 oracle + 2 challenger).
+        # We allocate double to avoid immediate port reuse after release.
+        ports_per_job = 4 if TestJob.BACK_TO_BACK else 2
+        for _ in range(self.jobs * ports_per_job * 2):
             TestJob.PORTS.put(self.find_port())
 
         self.job_timeout = 60
@@ -313,7 +334,9 @@ def get_test_uid(path: str) -> str:
 def get_test_list(service_filter=None) -> DAG:
     """Fetch the list of tests and return a DAG.
 
-    :param service_filter: optional service name to filter tests (e.g., 'arv', 'sensor-manager')
+    :param service_filter: optional filter string. May be a service name
+        prefix (e.g., 'arv') to include all tests under that service, or a
+        full test UID (e.g., 'arv.service_status') to run exactly one test.
     :return: a dag representing the tests to perform.
     """
     test_dag = DAG()
@@ -321,12 +344,54 @@ def get_test_list(service_filter=None) -> DAG:
 
     for test in test_list:
         test_uid = get_test_uid(test)
-        # If a service filter is provided, only include tests that match
-        if service_filter is None or test_uid.startswith(service_filter + '.'):
+        # Include the test if:
+        # - no filter specified, OR
+        # - the filter is an exact UID match, OR
+        # - the filter is a prefix of the UID (i.e., a service/group name)
+        if (service_filter is None
+                or test_uid == service_filter
+                or test_uid.startswith(service_filter + '.')):
             test_dag.add_vertex(
                 test_uid,
                 data=TestData(uid=test_uid, test_path=test))
     return test_dag
+
+
+def print_failure_summary() -> int:
+    """Print the content of every failed test output file.
+
+    A test is considered failed if its .out file either:
+    - does not contain the word "OK" (test never reached the success print), or
+    - contains "BackToBackMismatchError" (b2b comparison failed after assertions
+      passed on the oracle side).
+
+    :return: number of failures found
+    """
+    out_files = sorted(ls(os.path.join(RESULT_DIR, '*.out')))
+    total = len(out_files)
+    failures = []
+
+    for path in out_files:
+        with open(path) as fh:
+            content = fh.read()
+        if 'OK' not in content or 'BackToBackMismatchError' in content:
+            uid = os.path.basename(path)[:-len('.out')]
+            failures.append((uid, content))
+
+    if failures:
+        logging.info('')
+        logging.info('=' * 60)
+        logging.info('FAILURES (%d / %d)', len(failures), total)
+        logging.info('=' * 60)
+        for uid, content in failures:
+            logging.info('')
+            logging.info('--- FAIL: %s ---', uid)
+            # Print content directly so indentation/newlines are preserved.
+            print(content)
+    else:
+        logging.info('All %d tests passed.', total)
+
+    return len(failures)
 
 
 def main() -> int:
@@ -339,7 +404,42 @@ def main() -> int:
         'service',
         nargs='?',
         default=None,
-        help="optional service name to filter tests (e.g., 'arv', 'sensor-manager')")
+        help="optional filter: a service name (e.g., 'arv') to run all tests "
+        "for that service, or a full test UID (e.g., 'arv.service_status') "
+        "to run a single test")
+    m.argument_parser.add_argument(
+        '--impl',
+        choices=['cpp', 'ada', 'both'],
+        default='cpp',
+        help="which UxAS implementation to test: 'cpp' (default), 'ada', or "
+        "'both' for back-to-back comparison")
+    m.argument_parser.add_argument(
+        '--oracle',
+        choices=['cpp', 'ada'],
+        default='cpp',
+        help="in back-to-back mode, which implementation is the oracle whose "
+        "results are authoritative (default: 'cpp')")
+    m.argument_parser.add_argument(
+        '--challenger',
+        choices=['cpp', 'ada'],
+        default=None,
+        help="in back-to-back mode, which implementation is the challenger "
+        "being compared against the oracle (default: opposite of --oracle). "
+        "Use --challenger=cpp with --oracle=cpp to run two C++ instances as a "
+        "sanity check that the back-to-back infrastructure itself is correct.")
+    m.argument_parser.add_argument(
+        '--tolerance',
+        type=float,
+        default=1e-6,
+        metavar='TOL',
+        help="floating-point tolerance for back-to-back comparisons "
+        "(default: 1e-6)")
+    m.argument_parser.add_argument(
+        '--ignore-fields',
+        default='',
+        metavar='FIELDS',
+        help="comma-separated list of LMCP field names to ignore when "
+        "comparing oracle and challenger outputs (e.g., 'SourceServiceID')")
     m.argument_parser.add_argument(
         '--source-dir',
         metavar="DIR",
@@ -374,12 +474,36 @@ def main() -> int:
         logging.critical("zmp package is required. do pip install zmq")
         return 1
 
-    uxas_bin = which('uxas')
-    if not uxas_bin:
-        logging.critical("uxas executable should be in the path")
-        return 1
-    else:
+    # Validate that the required binaries are available.
+    if m.args.impl in ('cpp', 'both'):
+        uxas_bin = which('uxas')
+        if not uxas_bin:
+            logging.critical("uxas executable should be in the path")
+            return 1
         logging.info("uxas found in %s", uxas_bin)
+    if m.args.impl in ('ada', 'both'):
+        install_dir = os.environ.get('UXAS_ADA_INSTALL_DIR', '')
+        install_bin = os.path.join(install_dir, 'bin', 'uxas-ada') if install_dir else None
+        uxas_ada_bin = (os.environ.get('UXAS_ADA_BIN') or
+                        which('uxas-ada') or
+                        (install_bin if install_bin and os.path.isfile(install_bin) else None))
+        if not uxas_ada_bin:
+            logging.critical(
+                "uxas-ada executable not found; run with the uxas-ada anod "
+                "environment active, add it to PATH, or set UXAS_ADA_BIN")
+            return 1
+        logging.info("uxas-ada found in %s", uxas_ada_bin)
+        # Ensure the path is available to test subprocesses.
+        os.environ['UXAS_ADA_BIN'] = uxas_ada_bin
+
+    # Propagate implementation-selection settings to test subprocesses.
+    os.environ['UXAS_IMPL'] = m.args.impl
+    os.environ['UXAS_ORACLE'] = m.args.oracle
+    challenger = m.args.challenger or ('ada' if m.args.oracle == 'cpp' else 'cpp')
+    os.environ['UXAS_CHALLENGER'] = challenger
+    os.environ['UXAS_B2B_TOLERANCE'] = str(m.args.tolerance)
+    if m.args.ignore_fields:
+        os.environ['UXAS_B2B_IGNORED_FIELDS'] = m.args.ignore_fields
 
     rm(RESULT_DIR, recursive=True)
     mkdir(RESULT_DIR)
@@ -399,20 +523,27 @@ def main() -> int:
         os.environ['GCOV_PREFIX_STRIP'] = \
             str(len(m.args.source_dir.split(os.sep)) - 1)
 
+    TestJob.BACK_TO_BACK = (m.args.impl == 'both')
     TestsuiteLoop(actions=get_test_list(m.args.service), jobs=m.args.jobs)
 
     if (m.args.source_dir is not None and m.args.build_dir is not None
             and len(find(m.args.build_dir, "*.gc*")) > 0):
         # When a single service is specified, automatically show .h files
-        # unless explicitly disabled
+        # unless explicitly disabled.
+        # For coverage, use only the top-level service name (first UID
+        # component) so that 'arv.service_status' maps to 'arv', the same
+        # as passing 'arv' directly.
+        service_prefix = (m.args.service.split('.')[0]
+                          if m.args.service else None)
         show_includes = m.args.display_includes_coverage or (m.args.service is not None)
         dump_gcov_summary(m.args.source_dir,
                           m.args.build_dir,
                           gcda_dir,
                           show_includes,
-                          m.args.service)
+                          service_prefix)
 
-    return 0
+    failures = print_failure_summary()
+    return 1 if failures else 0
 
 
 if __name__ == '__main__':

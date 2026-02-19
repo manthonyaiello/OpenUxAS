@@ -22,7 +22,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
                     Object(class_name='KeepInZone', ZoneID=1,
                            randomize=True),
                     Object(class_name='KeepOutZone', ZoneID=2,
-                           randomize=True),
+                           ZoneType=1, randomize=True),
                     Object(class_name='OperatingRegion', ID=3,
                            KeepInAreas=[3], KeepOutAreas=[4]),
                     Object(class_name='cmasi.LineSearchTask', TaskID=1000,

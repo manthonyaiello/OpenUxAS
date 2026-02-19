@@ -299,13 +299,13 @@ package body UxAS.Comms.LMCP_Net_Client.Service.Automation_Request_Validator_Int
       ID          : constant Common.Int64 := Common.Int64 (Job.getTaskID);
 
       Wrapped_Job : constant Task_Kind_And_Id :=
-        (if Job.getLmcpTypeName = AFRL.Impact.AngledAreaSearchTask.Subscription then
+        (if Job.getFullLmcpTypeName = AFRL.Impact.AngledAreaSearchTask.Subscription then
            (Kind         => Angled_Area_Search_Task,
             SearchAreaID => Common.Int64 (AFRL.Impact.AngledAreaSearchTask.AngledAreaSearchTask (Job.all).getSearchAreaID))
-         elsif Job.getLmcpTypeName = AFRL.Impact.ImpactLineSearchTask.Subscription then
+         elsif Job.getFullLmcpTypeName = AFRL.Impact.ImpactLineSearchTask.Subscription then
            (Kind   => Impact_Line_Search_Task,
             LineID => Common.Int64 (AFRL.Impact.ImpactLineSearchTask.ImpactLineSearchTask (Job.all).getLineID))
-         elsif Job.getLmcpTypeName = AFRL.Impact.ImpactPointSearchTask.Subscription then
+         elsif Job.getFullLmcpTypeName = AFRL.Impact.ImpactPointSearchTask.Subscription then
            (Kind             => Impact_Point_Search_Task,
             SearchLocationID => Common.Int64 (AFRL.Impact.ImpactPointSearchTask.ImpactPointSearchTask (Job.all).getSearchLocationID))
          else (Kind => Other_Task));

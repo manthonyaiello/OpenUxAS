@@ -319,6 +319,7 @@ void AutomationRequestValidatorService::SendResponse(std::shared_ptr<uxas::messa
     {
         // look up play and solution IDs
         auto sandResponse = std::shared_ptr<afrl::impact::ImpactAutomationResponse> (new afrl::impact::ImpactAutomationResponse);
+        sandResponse->setResponseID(resp->getResponseID());
         sandResponse->setPlayID(m_sandboxMap[resp->getResponseID()].playId);
         sandResponse->setSolutionID(m_sandboxMap[resp->getResponseID()].solnId);
         sandResponse->setTrialResponse(resp->getOriginalResponse()->clone());

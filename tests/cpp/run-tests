@@ -11,6 +11,13 @@ source "${SCRIPT_DIR}/../../infrastructure/paths.sh"
 # Activate the python venv
 activate_venv
 
+# When testing Ada or running back-to-back, set up the Ada binary environment
+# via anod printenv so that uxas-ada is on PATH and UXAS_ADA_INSTALL_DIR is set.
+impl=$( get_option "$*" "--impl" )
+if [[ "${impl}" == "--impl=ada" || "${impl}" == "--impl=both" ]]; then
+    debug_and_run "eval \"\$( \"${OPENUXAS_ROOT}/anod\" printenv uxas-ada )\""
+fi
+
 # A specified qualifier should be used to set the env for finding uxas
 qualifier=$( get_option "$*" "--qualifier" )
 if [[ -n ${qualifier} ]]; then

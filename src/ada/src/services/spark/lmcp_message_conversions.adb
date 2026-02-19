@@ -859,6 +859,7 @@ package body LMCP_Message_Conversions is
       Result.TaskRelationships := Msg.all.getOriginalRequest.getTaskRelationships;
 
       Result.RedoAllTasks := Msg.all.getOriginalRequest.getRedoAllTasks;
+      Result.SandboxRequest := Msg.all.getSandBoxRequest;
 
       return Result;
    end As_TaskAutomationRequest_Message;

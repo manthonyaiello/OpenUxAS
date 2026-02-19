@@ -15,7 +15,7 @@ activate_venv
 qualifier=$( get_option "$*" "--qualifier" )
 if [[ -n ${qualifier} ]]; then
     debug_and_run "eval \"\$( \"${OPENUXAS_ROOT}/anod\" printenv uxas \"${qualifier}\" )\""
-    debug_and_run "python3 \"${TESTS_DIR}/cpp/run-tests.py\" ${@/$qualifier}"
+    debug_and_run "python3 \"${TESTS_DIR}/cpp/run-tests.py\" ${*/$qualifier}"
 
 # Assume the user would prefer to use the locally built uxas
 elif [ -f "${UXAS_BIN}" ]; then

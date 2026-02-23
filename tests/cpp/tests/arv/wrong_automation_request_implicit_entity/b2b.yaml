@@ -1,11 +1,15 @@
 # Per-test back-to-back comparison configuration.
 #
-# The AutomationResponse Info string embeds the internal UniqueAutomationRequest
-# RequestID, which differs between C++ (small sequential counter) and Ada
-# (counter starts at 10,000 by design).  The meaningful content of the error
-# (which zones/entities are unavailable) is identical; only the label differs.
+# The AutomationResponse Info string embeds numeric IDs that vary by design:
+# - RequestID differs between C++ (small sequential counter) and Ada (starts at 10,000).
+# - OperatingRegion and Task IDs come from randomized message data and differ per run.
+# All are normalized to [*] so comparisons focus on error structure, not specific values.
 field_rules:
   "Info[*].Value":
     normalize:
       - pattern: 'Automation Request ID\[\d+\]'
         replacement: 'Automation Request ID[*]'
+      - pattern: 'OperatingRegion Id\[-?\d+\]'
+        replacement: 'OperatingRegion Id[*]'
+      - pattern: 'Task with the Id\[-?\d+\]'
+        replacement: 'Task with the Id[*]'

@@ -526,7 +526,7 @@ bool AutomationRequestValidatorService::isCheckAutomationRequestRequirements(con
             bool isFoundAMatch{false};
             for (auto& id1 : m_availableConfigurationEntityIds)
             {
-                for (auto& id2 : m_availableConfigurationEntityIds)
+                for (auto& id2 : m_availableStateEntityIds)
                 {
                     if (id1 == id2)
                     {

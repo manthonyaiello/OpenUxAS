@@ -37,6 +37,19 @@ that test alone.  Supported keys:
       oracle and challenger values are converted to strings, each substitution
       is applied in order with re.sub, and the resulting strings are compared.
       Values that are equal after normalization are not reported as a mismatch.
+
+  xfail: true
+      Mark this test as an expected failure in B2B mode.  A test that fails
+      with a BackToBackMismatchError is reported as XFAIL rather than FAIL,
+      and the overall test run still exits with code 0.  If the test passes
+      unexpectedly (no mismatch), it is reported as XPASS and counted as an
+      error.
+
+  xfail_match: '<substring>'
+      Narrows the xfail scope: XFAIL only applies when the
+      BackToBackMismatchError message contains this substring.  A failure
+      whose message does not match is reported as a regular FAIL so new bugs
+      are not silently hidden.  Omit to accept any BackToBackMismatchError.
 """
 import os
 import re

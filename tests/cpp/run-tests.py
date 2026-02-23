@@ -362,7 +362,7 @@ def get_test_list(service_filter=None) -> DAG:
     return test_dag
 
 
-def print_failure_summary() -> int:
+def print_failure_summary(back_to_back: bool = False) -> int:
     """Print the content of every failed test output file.
 
     A test is considered failed if its .out file either:
@@ -370,17 +370,66 @@ def print_failure_summary() -> int:
     - contains "BackToBackMismatchError" (b2b comparison failed after assertions
       passed on the oracle side).
 
-    :return: number of failures found
+    In back-to-back mode a test may be marked as expected-to-fail (xfail) via
+    ``xfail: true`` in its b2b.yaml.  An xfail test that fails with a
+    BackToBackMismatchError is reported as XFAIL and is not counted as an
+    error.  An xfail test that passes unexpectedly is reported as XPASS and
+    *is* counted as an error (prompting the developer to remove the marking).
+
+    An optional ``xfail_match`` string in b2b.yaml narrows the scope: the XFAIL
+    classification only applies when the error output contains that substring.
+    If the test fails with a *different* BackToBackMismatchError (e.g., a wrong
+    computed value rather than the expected timeout), it is reported as a
+    regular FAIL so the new bug is not silently hidden.
+
+    :param back_to_back: True when running in B2B mode; enables xfail checks.
+    :return: number of errors found (failures + unexpected passes)
     """
+    import yaml
+
     out_files = sorted(ls(os.path.join(RESULT_DIR, '*.out')))
     total = len(out_files)
     failures = []
+    xfails = []
+    xpasses = []
 
     for path in out_files:
         with open(path) as fh:
             content = fh.read()
-        if 'OK' not in content or 'BackToBackMismatchError' in content:
-            uid = os.path.basename(path)[:-len('.out')]
+        uid = os.path.basename(path)[:-len('.out')]
+
+        has_ok = 'OK' in content
+        has_b2b_error = 'BackToBackMismatchError' in content
+
+        # Check for xfail flag in b2b.yaml (only meaningful in B2B mode).
+        is_xfail = False
+        xfail_match = None
+        if back_to_back:
+            b2b_yaml = os.path.join(
+                TEST_DIR, uid.replace('.', os.sep), 'b2b.yaml')
+            if os.path.exists(b2b_yaml):
+                with open(b2b_yaml) as fh:
+                    cfg = yaml.safe_load(fh) or {}
+                is_xfail = bool(cfg.get('xfail', False))
+                xfail_match = cfg.get('xfail_match', None)
+
+        if is_xfail:
+            if has_ok and has_b2b_error:
+                # Expected failure only if the error message matches.
+                # xfail_match=None means any BackToBackMismatchError qualifies.
+                if xfail_match is None or xfail_match in content:
+                    xfails.append((uid, content))
+                else:
+                    # Different failure than anticipated – real bug, not XFAIL.
+                    failures.append((uid, content))
+            elif has_ok and not has_b2b_error:
+                # Unexpected: test passed when it was marked as expected to
+                # fail – XPASS (counts as an error).
+                xpasses.append((uid, content))
+            else:
+                # Oracle-side assertion failed regardless of B2B – still FAIL.
+                failures.append((uid, content))
+        elif not has_ok or has_b2b_error:
             failures.append((uid, content))
 
     if failures:
@@ -393,10 +442,33 @@ def print_failure_summary() -> int:
             logging.info('--- FAIL: %s ---', uid)
             # Print content directly so indentation/newlines are preserved.
             print(content)
-    else:
-        logging.info('All %d tests passed.', total)
 
-    return len(failures)
+    if xpasses:
+        logging.info('')
+        logging.info('=' * 60)
+        logging.info('UNEXPECTED PASSES / XPASS (%d / %d)', len(xpasses), total)
+        logging.info('=' * 60)
+        for uid, content in xpasses:
+            logging.info('')
+            logging.info('--- XPASS: %s ---', uid)
+            print(content)
+
+    if xfails:
+        logging.info('')
+        for uid, _ in xfails:
+            logging.info('--- XFAIL: %s ---', uid)
+
+    error_count = len(failures) + len(xpasses)
+
+    if error_count == 0:
+        passed = total - len(xfails)
+        if xfails:
+            logging.info('%d tests passed, %d expected failure(s).',
+                         passed, len(xfails))
+        else:
+            logging.info('All %d tests passed.', total)
+
+    return error_count
 
 
 def main() -> int:
@@ -547,7 +619,7 @@ def main() -> int:
                           show_includes,
                           service_prefix)
 
-    failures = print_failure_summary()
+    failures = print_failure_summary(back_to_back=TestJob.BACK_TO_BACK)
     return 1 if failures else 0
 
 

@@ -1,0 +1,10 @@
+# Per-test back-to-back comparison configuration.
+#
+# The Ada ARV intentionally lacks timer callbacks, so it never sends an
+# AutomationResponse when TaskInitialized is not received within the timeout
+# window.  Mark as expected B2B failure until timer support is implemented.
+xfail: true
+xfail_match: "Challenger timed out waiting for afrl.cmasi.AutomationResponse"
+xfail_reason: >
+  Ada ARV lacks timer callbacks; never sends AutomationResponse
+  when tasks do not initialize within the timeout window.

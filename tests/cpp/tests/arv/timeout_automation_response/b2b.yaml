@@ -7,3 +7,12 @@
 # mismatch here avoids a spurious comparison failure.
 ignore_fields:
   - RequestID
+
+# The Ada ARV intentionally lacks timer callbacks, so it never sends an
+# AutomationResponse after the automation-response timeout expires.
+# Mark as expected B2B failure until timer support is implemented in Ada ARV.
+xfail: true
+xfail_match: "Challenger timed out waiting for afrl.cmasi.AutomationResponse"
+xfail_reason: >
+  Ada ARV lacks timer callbacks; never sends AutomationResponse
+  after the automation response timeout expires.

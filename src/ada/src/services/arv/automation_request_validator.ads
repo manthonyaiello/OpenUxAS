@@ -129,12 +129,11 @@ package Automation_Request_Validator with SPARK_Mode, Always_Terminates is
      (Config  : Automation_Request_Validator_Configuration_Data;
       Sandbox : in out Request_Details_Map;
       Mailbox : in out Automation_Request_Validator_Mailbox;
-      Request : in out UniqueAutomationRequest;
+      Request : in UniqueAutomationRequest;
       IsReady : out Boolean)
      with Pre => Has_Key (Sandbox, Request.RequestID),
      Post =>
      --  Request was removed from Sandbox iff IsReady is False
-
      Has_Key (Sandbox, Request.RequestID) = IsReady
      and then Sandbox <= Sandbox'Old
      and then Keys_Included_Except
@@ -143,14 +142,7 @@ package Automation_Request_Validator with SPARK_Mode, Always_Terminates is
         New_Key => Request.RequestID)
 
      --  IsReady is true if the automation request is valid
-
-     and then IsReady = Valid_Automation_Request (Config, Request'Old)
-     and then Request.OperatingRegion'Old = Request.OperatingRegion
-     and then Request.TaskList'Old = Request.TaskList
-     and then Request.RedoAllTasks'Old = Request.RedoAllTasks
-     and then Request.RequestID'Old = Request.RequestID
-     and then Request.PlanningStates'Old = Request.PlanningStates
-     and then Request.SandboxRequest'Old = Request.SandboxRequest;
+     and then IsReady = Valid_Automation_Request (Config, Request);
 
    procedure Handle_Automation_Request
      (Config  : Automation_Request_Validator_Configuration_Data;

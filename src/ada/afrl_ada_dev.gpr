@@ -95,7 +95,7 @@ project AFRL_Ada_Dev is
    end Pretty_Printer;
 
    package Prove is
-      for Proof_Switches ("Ada") use ("-j0", "--counterexamples=off", "-u", "--output=brief");
+      for Proof_Switches ("Ada") use ("-j0", "--counterexamples=off");
       for Proof_Dir use "proof";
    end Prove;
 

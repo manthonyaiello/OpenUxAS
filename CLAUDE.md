@@ -81,6 +81,43 @@ The C++ executable runs without Ada-implemented services, then the Ada executabl
 - Test with proof replay: `tests/proof/run-proofs`
 - **New services**: Use template at `src/ada/src/services/template/` (see its README.md)
 
+As an agent, you should run local builds of the Ada/SPARK code like this:
+
+```bash
+cd /data/OpenUxAS/ && \
+eval "$( ./anod printenv uxas-ada --build-env )" && \
+cd src/ada && \
+GPR_PROJECT_PATH="/data/Software/wave/x86_64-linux/spark2014/install/lib/gnat:${GPR_PROJECT_PATH}" \
+PATH="/data/Software/wave/x86_64-linux/gnatall/install/bin:$PATH" \
+gprbuild -P afrl_ada_dev.gpr -j0
+```
+
+The resulting executable is named `uxas-ada` and is found under `src/ada`.
+Set `UXAS_ADA_BIN=/data/OpenUxAS/src/ada/uxas-ada` to use this executable with scripts like `run-tests`.
+
+### Running GNATprove
+
+**Do NOT use the SPARK MCP server's `prove` tool.** It does not have access to the
+project-local sandbox dependencies (LMCP Ada bindings, ZeroMQ Ada bindings, etc.) and
+will fail to resolve `afrl_ada_dev.gpr` imports.
+
+Instead, run `gnatprove` via the Bash tool using `anod printenv` to set up the full
+environment:
+
+```bash
+cd /data/OpenUxAS && eval "$( ./anod printenv uxas-ada --build-env )" && cd src/ada && \
+  PATH="/data/Software/wave/x86_64-linux/spark2014/install/bin:${PATH}" \
+  GPR_PROJECT_PATH="/data/Software/wave/x86_64-linux/spark2014/install/lib/gnat:${GPR_PROJECT_PATH}" \
+  gnatprove -P afrl_ada_dev.gpr -j0 <other arguments>
+```
+
+Common `<other arguments>`:
+- `--level=1` — proof level (0–4)
+- `--limit-subp=file.adb:NN` — prove only the subprogram at line NN
+- `--report=all` — show all check results, not just unproved ones
+
+(Don't forget that with `--limit-subp` or `--limit-line` the filename should not include the `src` directory - the GPR file handles that bit.)
+
 ### Ada Services
 Current Ada services include:
 - **ARV** (Automation Request Validator): Validates automation requests

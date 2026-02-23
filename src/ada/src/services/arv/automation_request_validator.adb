@@ -560,6 +560,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       Unique_Automation_Request.OperatingRegion := Request.OperatingRegion;
       Unique_Automation_Request.TaskList := Request.TaskList;
       Unique_Automation_Request.TaskRelationships := Request.TaskRelationships;
+      Unique_Automation_Request.RedoAllTasks := Request.RedoAllTasks;
       Unique_Automation_Request.SandboxRequest := True;
 
       Details.Play_Id := Request.PlayID;
@@ -603,6 +604,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       Unique_Automation_Request.OperatingRegion := Request.OperatingRegion;
       Unique_Automation_Request.TaskList := Request.TaskList;
       Unique_Automation_Request.TaskRelationships := Request.TaskRelationships;
+      Unique_Automation_Request.RedoAllTasks := Request.RedoAllTasks;
       Unique_Automation_Request.SandboxRequest := Request.SandboxRequest;
       Unique_Automation_Request.PlanningStates := Request.PlanningStates;
 

@@ -1,6 +1,9 @@
 with LMCP_Messages;
 
 with AFRL.CMASI.AutomationRequest;                    use AFRL.CMASI.AutomationRequest;
+with AFRL.CMASI.EntityConfiguration;                  use AFRL.CMASI.EntityConfiguration;
+with UxAS.Messages.lmcptask.SensorFootprintRequests;
+  use UxAS.Messages.lmcptask.SensorFootprintRequests;
 with AFRL.CMASI.EntityState;                          use AFRL.CMASI.EntityState;
 with AFRL.CMASI.KeyValuePair;                         use AFRL.CMASI.KeyValuePair;
 with AFRL.CMASI.Location3D;                           use AFRL.CMASI.Location3D;
@@ -59,5 +62,12 @@ package LMCP_Message_Conversions is
    function As_MissionCommand_Message (Msg : not null MissionCommand_Acc) return LMCP_Messages.MissionCommand;
 
    function As_Object_Any (Msg : LMCP_Messages.Message_Root'Class) return AVTAS.LMCP.Object.Object_Any;
+
+   function As_EntityConfig_Message
+     (Msg : not null EntityConfiguration_Any) return LMCP_Messages.EntityConfig;
+
+   function As_SensorFootprintRequests_Message
+     (Msg : not null SensorFootprintRequests_Any)
+      return LMCP_Messages.SensorFootprintRequests_Msg;
 
 end LMCP_Message_Conversions;

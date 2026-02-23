@@ -1,4 +1,11 @@
+
 with AFRL.CMASI.AutomationResponse;                 use AFRL.CMASI.AutomationResponse;
+with AFRL.CMASI.CameraConfiguration;               use AFRL.CMASI.CameraConfiguration;
+with AFRL.CMASI.GimbalConfiguration;               use AFRL.CMASI.GimbalConfiguration;
+with UxAS.Messages.lmcptask.FootprintRequest;      use UxAS.Messages.lmcptask.FootprintRequest;
+with UxAS.Messages.lmcptask.SensorFootprint;       use UxAS.Messages.lmcptask.SensorFootprint;
+with UxAS.Messages.lmcptask.SensorFootprintResponse;
+  use UxAS.Messages.lmcptask.SensorFootprintResponse;
 with AFRL.CMASI.Enumerations;
 with AFRL.CMASI.MissionCommand;                     use AFRL.CMASI.MissionCommand;
 with AFRL.CMASI.ServiceStatus;                      use AFRL.CMASI.ServiceStatus;
@@ -501,6 +508,72 @@ package body LMCP_Message_Conversions is
 
       elsif Msg in LMCP_Messages.MissionCommand'Class then
          Result := AVTAS.LMCP.Object.Object_Any (As_MissionCommand_Acc (LMCP_Messages.MissionCommand (Msg)));
+
+      elsif Msg in LMCP_Messages.SensorFootprintResponse_Msg'Class then
+         declare
+            use all type LMCP_Messages.SensorFootprint_Seq;
+            M    : LMCP_Messages.SensorFootprintResponse_Msg renames
+                     LMCP_Messages.SensorFootprintResponse_Msg (Msg);
+            Resp : constant SensorFootprintResponse_Acc :=
+                     new SensorFootprintResponse;
+         begin
+            Resp.all.setResponseID (AVTAS.LMCP.Types.Int64 (M.ResponseID));
+            for FP of M.Footprints loop
+               declare
+                  AFP : constant SensorFootprint_Acc := new SensorFootprint;
+               begin
+                  AFP.all.setFootprintResponseID
+                    (AVTAS.LMCP.Types.Int64 (FP.FootprintResponseID));
+                  AFP.all.setVehicleID
+                    (AVTAS.LMCP.Types.Int64 (FP.VehicleID));
+                  AFP.all.setCameraID
+                    (AVTAS.LMCP.Types.Int64 (FP.CameraID));
+                  AFP.all.setGimbalID
+                    (AVTAS.LMCP.Types.Int64 (FP.GimbalID));
+                  AFP.all.setHorizontalFOV
+                    (AVTAS.LMCP.Types.Real32 (FP.HorizontalFOV));
+                  AFP.all.setAglAltitude
+                    (AVTAS.LMCP.Types.Real32 (FP.AglAltitude));
+                  AFP.all.setGimbalElevation
+                    (AVTAS.LMCP.Types.Real32 (FP.GimbalElevation));
+                  AFP.all.setAspectRatio
+                    (AVTAS.LMCP.Types.Real32 (FP.AspectRatio));
+                  AFP.all.setAchievedGSD
+                    (AVTAS.LMCP.Types.Real32 (FP.AchievedGSD));
+                  case FP.CameraWavelength is
+                     when LMCP_Messages.AllAny =>
+                        AFP.all.setCameraWavelength
+                          (AFRL.CMASI.Enumerations.AllAny);
+                     when LMCP_Messages.EO =>
+                        AFP.all.setCameraWavelength (AFRL.CMASI.Enumerations.EO);
+                     when LMCP_Messages.LWIR =>
+                        AFP.all.setCameraWavelength
+                          (AFRL.CMASI.Enumerations.LWIR);
+                     when LMCP_Messages.SWIR =>
+                        AFP.all.setCameraWavelength
+                          (AFRL.CMASI.Enumerations.SWIR);
+                     when LMCP_Messages.MWIR =>
+                        AFP.all.setCameraWavelength
+                          (AFRL.CMASI.Enumerations.MWIR);
+                     when LMCP_Messages.Other =>
+                        AFP.all.setCameraWavelength
+                          (AFRL.CMASI.Enumerations.Other);
+                  end case;
+                  AFP.all.setHorizontalToLeadingEdge
+                    (AVTAS.LMCP.Types.Real32 (FP.HorizontalToLeadingEdge));
+                  AFP.all.setHorizontalToTrailingEdge
+                    (AVTAS.LMCP.Types.Real32 (FP.HorizontalToTrailingEdge));
+                  AFP.all.setHorizontalToCenter
+                    (AVTAS.LMCP.Types.Real32 (FP.HorizontalToCenter));
+                  AFP.all.setWidthCenter
+                    (AVTAS.LMCP.Types.Real32 (FP.WidthCenter));
+                  AFP.all.setSlantRangeToCenter
+                    (AVTAS.LMCP.Types.Real32 (FP.SlantRangeToCenter));
+                  Resp.all.getFootprints.Append (AFP);
+               end;
+            end loop;
+            Result := AVTAS.LMCP.Object.Object_Any (Resp);
+         end;
 
       else
          raise Program_Error with "unexpected message kind in Route_Aggregator_Message_Conversions.As_Object_Any";
@@ -1304,4 +1377,146 @@ package body LMCP_Message_Conversions is
 
       return Result;
    end As_Waypoint_Message;
+   ----------------------------
+   -- As_EntityConfig_Message --
+   ----------------------------
+
+   function As_EntityConfig_Message
+     (Msg : not null EntityConfiguration_Any) return LMCP_Messages.EntityConfig
+   is
+      Result : LMCP_Messages.EntityConfig;
+      use Common;
+      use all type LMCP_Messages.GimbalConfig_Seq;
+      use all type LMCP_Messages.CameraConfig_Seq;
+      use all type LMCP_Messages.Real32_Seq;
+      use all type Common.Int64_Seq;
+   begin
+      Result.ID := Int64 (Msg.all.getID);
+      Result.NominalAltitude := Real32 (Msg.all.getNominalAltitude);
+
+      for Payload of Msg.all.getPayloadConfigurationList.all loop
+         if Payload.all in GimbalConfiguration'Class then
+            declare
+               G      : constant GimbalConfiguration_Any :=
+                          GimbalConfiguration_Any (Payload);
+               Gimbal : LMCP_Messages.GimbalConfig;
+            begin
+               Gimbal.PayloadID := Int64 (G.all.getPayloadID);
+               Gimbal.MinElevation := Real32 (G.all.getMinElevation);
+               Gimbal.MaxElevation := Real32 (G.all.getMaxElevation);
+               Gimbal.IsElevationClamped := G.all.getIsElevationClamped;
+               for ID of G.all.getContainedPayloadList.all loop
+                  Gimbal.ContainedPayloadList :=
+                    Add (Gimbal.ContainedPayloadList, Int64 (ID));
+               end loop;
+               Result.Gimbals := Add (Result.Gimbals, Gimbal);
+            end;
+         elsif Payload.all in CameraConfiguration'Class then
+            declare
+               C      : constant CameraConfiguration_Any :=
+                          CameraConfiguration_Any (Payload);
+               Camera : LMCP_Messages.CameraConfig;
+            begin
+               Camera.PayloadID := Int64 (C.all.getPayloadID);
+               case C.all.getSupportedWavelengthBand is
+                  when AFRL.CMASI.Enumerations.AllAny =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.AllAny;
+                  when AFRL.CMASI.Enumerations.EO =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.EO;
+                  when AFRL.CMASI.Enumerations.LWIR =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.LWIR;
+                  when AFRL.CMASI.Enumerations.SWIR =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.SWIR;
+                  when AFRL.CMASI.Enumerations.MWIR =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.MWIR;
+                  when AFRL.CMASI.Enumerations.Other =>
+                     Camera.SupportedWavelengthBand := LMCP_Messages.Other;
+               end case;
+               case C.all.getFieldOfViewMode is
+                  when AFRL.CMASI.Enumerations.Continuous =>
+                     Camera.FieldOfViewMode := LMCP_Messages.Continuous;
+                  when AFRL.CMASI.Enumerations.Discrete =>
+                     Camera.FieldOfViewMode := LMCP_Messages.Discrete;
+               end case;
+               Camera.MinHorizontalFOV :=
+                 Real32 (C.all.getMinHorizontalFieldOfView);
+               Camera.MaxHorizontalFOV :=
+                 Real32 (C.all.getMaxHorizontalFieldOfView);
+               for FOV of C.all.getDiscreteHorizontalFieldOfViewList.all loop
+                  Camera.DiscreteHFOVList :=
+                    Add (Camera.DiscreteHFOVList, Real32 (FOV));
+               end loop;
+               Camera.HorizResolution :=
+                 UInt32 (C.all.getVideoStreamHorizontalResolution);
+               Camera.VertResolution :=
+                 UInt32 (C.all.getVideoStreamVerticalResolution);
+               Result.Cameras := Add (Result.Cameras, Camera);
+            end;
+         end if;
+      end loop;
+
+      return Result;
+   end As_EntityConfig_Message;
+
+   --------------------------------------------
+   -- As_SensorFootprintRequests_Message --
+   --------------------------------------------
+
+   function As_SensorFootprintRequests_Message
+     (Msg : not null SensorFootprintRequests_Any)
+      return LMCP_Messages.SensorFootprintRequests_Msg
+   is
+      Result : LMCP_Messages.SensorFootprintRequests_Msg;
+      use Common;
+      use all type LMCP_Messages.FootprintRequest_Seq;
+      use all type LMCP_Messages.WavelengthBand_Seq;
+      use all type LMCP_Messages.Real32_Seq;
+   begin
+      Result.RequestID := Int64 (Msg.all.getRequestID);
+
+      for FP_Ada of Msg.all.getFootprints.all loop
+         declare
+            FP : LMCP_Messages.FootprintRequest_Msg;
+         begin
+            FP.FootprintRequestID :=
+              Int64 (FP_Ada.all.getFootprintRequestID);
+            FP.VehicleID := Int64 (FP_Ada.all.getVehicleID);
+            for W of FP_Ada.all.getEligibleWavelengths.all loop
+               declare
+                  WB : LMCP_Messages.WavelengthBandEnum;
+               begin
+                  case W is
+                     when AFRL.CMASI.Enumerations.AllAny =>
+                        WB := LMCP_Messages.AllAny;
+                     when AFRL.CMASI.Enumerations.EO =>
+                        WB := LMCP_Messages.EO;
+                     when AFRL.CMASI.Enumerations.LWIR =>
+                        WB := LMCP_Messages.LWIR;
+                     when AFRL.CMASI.Enumerations.SWIR =>
+                        WB := LMCP_Messages.SWIR;
+                     when AFRL.CMASI.Enumerations.MWIR =>
+                        WB := LMCP_Messages.MWIR;
+                     when AFRL.CMASI.Enumerations.Other =>
+                        WB := LMCP_Messages.Other;
+                  end case;
+                  FP.EligibleWavelengths := Add (FP.EligibleWavelengths, WB);
+               end;
+            end loop;
+            for G of FP_Ada.all.getGroundSampleDistances.all loop
+               FP.GroundSampleDistances :=
+                 Add (FP.GroundSampleDistances, Real32 (G));
+            end loop;
+            for A of FP_Ada.all.getAglAltitudes.all loop
+               FP.AglAltitudes := Add (FP.AglAltitudes, Real32 (A));
+            end loop;
+            for E of FP_Ada.all.getElevationAngles.all loop
+               FP.ElevationAngles := Add (FP.ElevationAngles, Real32 (E));
+            end loop;
+            Result.Footprints := Add (Result.Footprints, FP);
+         end;
+      end loop;
+
+      return Result;
+   end As_SensorFootprintRequests_Message;
+
 end LMCP_Message_Conversions;

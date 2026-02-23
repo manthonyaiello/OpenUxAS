@@ -359,4 +359,103 @@ package LMCP_Messages with SPARK_Mode is
       TaskList : TaskAssignment_Sequence;
    end record;
 
+   --  Sensor Manager types
+
+   type WavelengthBandEnum is (AllAny, EO, LWIR, SWIR, MWIR, Other);
+
+   type FOVOperationModeEnum is (Continuous, Discrete);
+
+   package Real32_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => Real32);
+   type Real32_Seq is new Real32_Sequences.Sequence;
+
+   package WavelengthBand_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => WavelengthBandEnum);
+   type WavelengthBand_Seq is new WavelengthBand_Sequences.Sequence;
+
+   type CameraConfig is record
+      PayloadID               : Int64 := 0;
+      SupportedWavelengthBand : WavelengthBandEnum := AllAny;
+      FieldOfViewMode         : FOVOperationModeEnum := Continuous;
+      MinHorizontalFOV        : Real32 := 0.0;
+      MaxHorizontalFOV        : Real32 := 0.0;
+      DiscreteHFOVList        : Real32_Seq;
+      HorizResolution         : UInt32 := 0;
+      VertResolution          : UInt32 := 0;
+   end record;
+
+   package CameraConfig_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => CameraConfig);
+   type CameraConfig_Seq is new CameraConfig_Sequences.Sequence;
+
+   type GimbalConfig is record
+      PayloadID            : Int64 := 0;
+      MinElevation         : Real32 := -180.0;
+      MaxElevation         : Real32 := 180.0;
+      IsElevationClamped   : Boolean := False;
+      ContainedPayloadList : Int64_Seq;
+   end record;
+
+   package GimbalConfig_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => GimbalConfig);
+   type GimbalConfig_Seq is new GimbalConfig_Sequences.Sequence;
+
+   type EntityConfig is record
+      ID              : Int64 := 0;
+      NominalAltitude : Real32 := 0.0;
+      Gimbals         : GimbalConfig_Seq;
+      Cameras         : CameraConfig_Seq;
+   end record;
+
+   type FootprintRequest_Msg is record
+      FootprintRequestID    : Int64 := 0;
+      VehicleID             : Int64 := 0;
+      EligibleWavelengths   : WavelengthBand_Seq;
+      GroundSampleDistances : Real32_Seq;
+      AglAltitudes          : Real32_Seq;
+      ElevationAngles       : Real32_Seq;
+   end record;
+
+   package FootprintRequest_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => FootprintRequest_Msg);
+   type FootprintRequest_Seq is new FootprintRequest_Sequences.Sequence;
+
+   type SensorFootprintRequests_Msg is new Message_Root with record
+      RequestID  : Int64 := 0;
+      Footprints : FootprintRequest_Seq;
+   end record;
+
+   type SensorFootprint_Msg is record
+      FootprintResponseID      : Int64 := 0;
+      VehicleID                : Int64 := 0;
+      CameraID                 : Int64 := 0;
+      GimbalID                 : Int64 := 0;
+      HorizontalFOV            : Real32 := 0.0;
+      AglAltitude              : Real32 := 0.0;
+      GimbalElevation          : Real32 := 0.0;
+      AspectRatio              : Real32 := 0.0;
+      AchievedGSD              : Real32 := 0.0;
+      CameraWavelength         : WavelengthBandEnum := AllAny;
+      HorizontalToLeadingEdge  : Real32 := 0.0;
+      HorizontalToTrailingEdge : Real32 := 0.0;
+      HorizontalToCenter       : Real32 := 0.0;
+      WidthCenter              : Real32 := 0.0;
+      SlantRangeToCenter       : Real32 := 0.0;
+   end record;
+
+   package SensorFootprint_Sequences is new SPARK.Containers.Functional.Vectors
+     (Index_Type   => Positive,
+      Element_Type => SensorFootprint_Msg);
+   type SensorFootprint_Seq is new SensorFootprint_Sequences.Sequence;
+
+   type SensorFootprintResponse_Msg is new Message_Root with record
+      ResponseID : Int64 := 0;
+      Footprints : SensorFootprint_Seq;
+   end record;
+
 end LMCP_Messages;

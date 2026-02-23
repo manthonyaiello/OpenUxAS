@@ -243,6 +243,11 @@ class TestJob(ProcessJob):
                 'tcp://127.0.0.1:%s' % self.challenger_in_port)
             env['CHALLENGER_IN_URL'] = (
                 'tcp://127.0.0.1:%s' % self.challenger_out_port)
+            # Expose per-test B2B config if a b2b.yaml exists alongside test.py
+            b2b_yaml = os.path.join(
+                os.path.dirname(self.data.test_path), 'b2b.yaml')
+            if os.path.exists(b2b_yaml):
+                env['UXAS_B2B_CONFIG'] = b2b_yaml
         return {'output': os.path.join(RESULT_DIR, self.uid + '.out'),
                 'ignore_environ': False,
                 'env': env}

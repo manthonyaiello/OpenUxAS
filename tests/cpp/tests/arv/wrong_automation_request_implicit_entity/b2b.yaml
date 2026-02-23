@@ -1,0 +1,11 @@
+# Per-test back-to-back comparison configuration.
+#
+# The AutomationResponse Info string embeds the internal UniqueAutomationRequest
+# RequestID, which differs between C++ (small sequential counter) and Ada
+# (counter starts at 10,000 by design).  The meaningful content of the error
+# (which zones/entities are unavailable) is identical; only the label differs.
+field_rules:
+  "Info[*].Value":
+    normalize:
+      - pattern: 'Automation Request ID\[\d+\]'
+        replacement: 'Automation Request ID[*]'

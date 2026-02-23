@@ -12,10 +12,34 @@ Controlled by environment variables set by run-tests.py:
                            (default: '1e-6')
   UXAS_B2B_IGNORED_FIELDS  comma-separated field names to skip in comparison
                            (default: '')
+  UXAS_B2B_CONFIG          path to a per-test b2b.yaml configuration file
+                           (set automatically by run-tests.py when present)
   CHALLENGER_OUT_URL       URL for challenger hub-input PULL socket
   CHALLENGER_IN_URL        URL for challenger hub-output PUB socket
+
+Per-test configuration (b2b.yaml)
+----------------------------------
+A test directory may contain a b2b.yaml file to customise B2B comparison for
+that test alone.  Supported keys:
+
+  ignore_fields: [FieldName, ...]
+      Additional field names to skip at any nesting level (supplements the
+      global --ignore-fields flag).
+
+  field_rules:
+      "path.with[*].wildcards":
+          normalize:
+              - pattern: '<regex>'
+                replacement: '<string>'
+          ...
+      Path keys use the same dotted notation produced by compare_objects.
+      [*] matches any list index.  When a normalize rule matches, both the
+      oracle and challenger values are converted to strings, each substitution
+      is applied in order with re.sub, and the resulting strings are compared.
+      Values that are equal after normalization are not reported as a mismatch.
 """
 import os
+import re
 import typing
 
 from pylmcp.message import Message
@@ -27,6 +51,28 @@ from pylmcp.server import Server, AdaServer, ServerTimeout, DEFAULT_IN_URL, DEFA
 class BackToBackMismatchError(Exception):
     """Raised when oracle and challenger produce different outputs."""
     pass
+
+
+def _path_key_to_regex(key: str) -> 're.Pattern[str]':
+    """Compile a field_rules path key to a regex pattern.
+
+    [*] in the key matches any list index (e.g. Info[*].Value matches
+    Info[0].Value, Info[1].Value, etc.).
+    All other regex metacharacters are treated as literals.
+    """
+    escaped = re.escape(key)
+    # re.escape turns [*] into \[\*\]; replace with \[\d+\] to match indices.
+    pattern = escaped.replace(r'\[\*\]', r'\[\d+\]')
+    return re.compile(r'^' + pattern + r'$')
+
+
+def _compile_field_rules(field_rules: dict) -> list:
+    """Pre-compile field_rules path keys to regex patterns.
+
+    Returns a list of (compiled_path_pattern, rule_dict) pairs.
+    """
+    return [(_path_key_to_regex(key), rule)
+            for key, rule in field_rules.items()]
 
 
 def _make_server(impl: str, out_url: str, in_url: str,
@@ -95,7 +141,19 @@ class BackToBackServer(object):
         ignored_raw = os.environ.get('UXAS_B2B_IGNORED_FIELDS', '')
         self.ignored_fields = set(
             f.strip() for f in ignored_raw.split(',') if f.strip())
+        self.field_rules = []  # type: typing.List[typing.Tuple]
         self.mismatches = []  # type: typing.List[str]
+
+        # Load per-test configuration from b2b.yaml if present.
+        b2b_config_path = os.environ.get('UXAS_B2B_CONFIG', '')
+        if b2b_config_path:
+            import yaml
+            with open(b2b_config_path) as fh:
+                cfg = yaml.safe_load(fh) or {}
+            for field in cfg.get('ignore_fields', []):
+                self.ignored_fields.add(field.strip())
+            self.field_rules = _compile_field_rules(
+                cfg.get('field_rules', {}))
         # Maps oracle UniqueAutomationRequest.RequestID to challenger's.
         # Used by send_msg to substitute the correct ResponseID so the
         # challenger processes UniqueAutomationResponse messages correctly.
@@ -178,7 +236,8 @@ class BackToBackServer(object):
         """Compare oracle and challenger messages, recording any differences."""
         diffs = compare_objects(oracle_msg.obj, challenger_msg.obj,
                                 tolerance=self.tolerance,
-                                ignored_fields=self.ignored_fields)
+                                ignored_fields=self.ignored_fields,
+                                field_rules=self.field_rules)
         if diffs:
             label = descriptor or oracle_msg.descriptor
             self.mismatches.append(
@@ -209,7 +268,8 @@ class BackToBackServer(object):
 
 
 def compare_objects(a, b, tolerance: float, ignored_fields: set,
-                    path: str = '') -> typing.List[str]:
+                    path: str = '',
+                    field_rules: list = None) -> typing.List[str]:
     """Recursively compare two LMCP Objects or values.
 
     Returns a list of human-readable difference strings. An empty list means
@@ -220,7 +280,11 @@ def compare_objects(a, b, tolerance: float, ignored_fields: set,
     :param tolerance: absolute+relative tolerance for float comparisons
     :param ignored_fields: set of field names to skip at any nesting level
     :param path: dotted path for error messages (built during recursion)
+    :param field_rules: pre-compiled list of (path_regex, rule_dict) pairs
+        from the per-test b2b.yaml; applied at scalar comparison points
     """
+    if field_rules is None:
+        field_rules = []
     diffs = []
 
     # Unwrap pylmcp Object instances to their data dicts.
@@ -249,7 +313,7 @@ def compare_objects(a, b, tolerance: float, ignored_fields: set,
             else:
                 diffs.extend(compare_objects(a_data[key], b_data[key],
                                              tolerance, ignored_fields,
-                                             field_path))
+                                             field_path, field_rules))
         return diffs
 
     if isinstance(a_data, list) and isinstance(b_data, list):
@@ -259,12 +323,29 @@ def compare_objects(a, b, tolerance: float, ignored_fields: set,
             # Still compare common prefix so we get more detail.
         for i, (av, bv) in enumerate(zip(a_data, b_data)):
             diffs.extend(compare_objects(av, bv, tolerance, ignored_fields,
-                                         '%s[%d]' % (path, i)))
+                                         '%s[%d]' % (path, i), field_rules))
         return diffs
 
     # Scalar comparison.
     a_val = a_data
     b_val = b_data
+
+    # Check per-test field rules for this path.
+    for pattern, rule in field_rules:
+        if pattern.match(path):
+            normalize_steps = rule.get('normalize', [])
+            if normalize_steps:
+                a_norm = str(a_val)
+                b_norm = str(b_val)
+                for step in normalize_steps:
+                    a_norm = re.sub(step['pattern'],
+                                    step.get('replacement', ''), a_norm)
+                    b_norm = re.sub(step['pattern'],
+                                    step.get('replacement', ''), b_norm)
+                if a_norm != b_norm:
+                    diffs.append('%s: %r vs %r (after normalization)' % (
+                        path or '<root>', a_norm, b_norm))
+            return diffs  # Rule handled this path; skip default comparison.
 
     if isinstance(a_val, float) or isinstance(b_val, float):
         try:

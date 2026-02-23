@@ -21,8 +21,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       States           : Int64_Set;
       Planning_States  : PlanningState_Seq;
       ReasonForFailure : in out Unbounded_String;
-      IsReady          : in out Boolean;
-      EntityList       : in out Int64_Seq)
+      IsReady          : in out Boolean)
    with Post =>
      IsReady = (IsReady'Old and
                   Check_For_Required_Entity_Configurations
@@ -87,7 +86,6 @@ package body Automation_Request_Validator with SPARK_Mode is
         To_Unbounded_String
           ("Automation Request ID["
            & Print_Int64 (Request.RequestID) & "] Not Ready ::" & LF);
-      EntityList : Int64_Seq;
    begin
       IsReady := True;
 
@@ -97,8 +95,7 @@ package body Automation_Request_Validator with SPARK_Mode is
          States           => Config.Available_State_Entity_Ids,
          Planning_States  => Request.PlanningStates,
          ReasonForFailure => ReasonForFailure,
-         IsReady          => IsReady,
-         EntityList       => EntityList);
+         IsReady          => IsReady);
 
       Check_Required_Operating_Region_And_Keepin_Keepout_Zones
         (Operating_Region  => Request.OperatingRegion,
@@ -116,10 +113,6 @@ package body Automation_Request_Validator with SPARK_Mode is
          TaskIds                         => Request.TaskList,
          ReasonForFailure                => ReasonForFailure,
          IsReady                         => IsReady);
-
-      if Length (Request.EntityList) = 0 then
-         Request.EntityList := EntityList;
-      end if;
 
       if not IsReady then
          declare
@@ -146,8 +139,7 @@ package body Automation_Request_Validator with SPARK_Mode is
       States           : Int64_Set;
       Planning_States  : PlanningState_Seq;
       ReasonForFailure : in out Unbounded_String;
-      IsReady          : in out Boolean;
-      EntityList       : in out Int64_Seq)
+      IsReady          : in out Boolean)
    is
    begin
       if Length (Entity_Ids) /= 0 then
@@ -252,8 +244,6 @@ package body Automation_Request_Validator with SPARK_Mode is
                             (not Contains (S, I) and then Contains (States, I))));
                   Id := Int64_Sets.Choose (S);
                   if Contains (States, Id) then
-                     pragma Assume (Length (EntityList) < To_Big_Integer (Count_Type'Last), "we have less than Count_Type'Last vehicles");
-                     EntityList := Add (EntityList, Id);
                      IsFoundAMatch := True;
                   end if;
                end loop;

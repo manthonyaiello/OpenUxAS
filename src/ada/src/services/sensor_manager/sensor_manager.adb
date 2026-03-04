@@ -20,6 +20,7 @@ package body Sensor_Manager with SPARK_Mode is
    ELEV_MIN_BOUND               : constant Real64 := -(Pi - Pi / 180.0);
 
    --  Local subprogram declarations
+
    procedure Calculate_Sensor_Footprint
      (FP            : in out SensorFootprint_Msg;
       Altitude      : Real64;
@@ -27,6 +28,76 @@ package body Sensor_Manager with SPARK_Mode is
       Horiz_FOV_Rad : Real64;
       Aspect_Ratio  : Real64)
      with Always_Terminates;
+
+   procedure Update_Best
+     (FP                : in out SensorFootprint_Msg;
+      First_GSD_Found   : in out Boolean;
+      FOV_Deg           : Real64;
+      Slant             : Real64;
+      Min_Res           : Real64;
+      Acceptable_GSD    : Real64;
+      Altitude          : Real64;
+      Elev_Rad          : Real64;
+      Aspect            : Real64;
+      Camera_ID         : Int64;
+      Camera_Wavelength : WavelengthBandEnum;
+      Gimbal_ID         : Int64)
+     with Always_Terminates;
+   --  Update FP with the given FOV_Deg if it produces a better GSD match.
+   --  "Better" means |Acceptable_GSD - GSD| < current best (using C++ integer
+   --  truncation semantics for the comparison).
+
+   procedure Process_Camera
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Camera              : CameraConfig;
+      Gimbal_ID           : Int64;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Slant               : Real64;
+      Altitude            : Real64;
+      Elev_Rad            : Real64;
+      Acceptable_GSD      : Real64)
+     with Always_Terminates;
+   --  Check wavelength eligibility for Camera, then iterate over its FOV
+   --  configurations and call Update_Best for each candidate.
+
+   procedure Process_Gimbal_At_Elevation
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Gimbal              : GimbalConfig;
+      Cameras             : CameraConfig_Seq;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Slant               : Real64;
+      Altitude            : Real64;
+      Elev_Rad            : Real64;
+      Acceptable_GSD      : Real64)
+     with Always_Terminates;
+   --  For a given Gimbal and elevation step (Elev_Rad, Slant already computed),
+   --  find cameras in Cameras whose PayloadID matches a ContainedPayloadList
+   --  entry and process each via Process_Camera.
+
+   procedure Compute_Elevation_Range
+     (Gimbal          : GimbalConfig;
+      Elevation_Angle : Real64;
+      Elev_Min        : out Real64;
+      Elev_Max        : out Real64)
+     with Always_Terminates;
+   --  Convert Gimbal's elevation limits to radians, apply clamping to the
+   --  valid downward-facing range, handle the unclamped case, and apply
+   --  the elevation-angle override (replicating C++ behavior).
+
+   procedure Process_Gimbal
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Gimbal              : GimbalConfig;
+      Cameras             : CameraConfig_Seq;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Acceptable_GSD      : Real64;
+      Altitude            : Real64;
+      Elevation_Angle     : Real64)
+     with Always_Terminates;
+   --  Compute the effective elevation range for Gimbal, then iterate over
+   --  elevation steps, calling Process_Gimbal_At_Elevation for each.
 
    procedure Find_Sensor_Footprint
      (Entity_Cfg          : EntityConfig;
@@ -101,6 +172,238 @@ package body Sensor_Manager with SPARK_Mode is
       FP.WidthCenter              := Real32 (Width_Center);
    end Calculate_Sensor_Footprint;
 
+   -----------------
+   -- Update_Best --
+   -----------------
+
+   procedure Update_Best
+     (FP                : in out SensorFootprint_Msg;
+      First_GSD_Found   : in out Boolean;
+      FOV_Deg           : Real64;
+      Slant             : Real64;
+      Min_Res           : Real64;
+      Acceptable_GSD    : Real64;
+      Altitude          : Real64;
+      Elev_Rad          : Real64;
+      Aspect            : Real64;
+      Camera_ID         : Int64;
+      Camera_Wavelength : WavelengthBandEnum;
+      Gimbal_ID         : Int64)
+   is
+      pragma SPARK_Mode (Off);
+      use Math;
+      FOV_Rad       : constant Real64 := FOV_Deg * Deg_To_Rad;
+      Alpha_Rad     : constant Real64 :=
+        (if Min_Res <= 0.0 then Pi / 2.0
+         else FOV_Rad / Min_Res);
+      GSD           : constant Real64 := Slant * Sin (Alpha_Rad);
+      --  Match C++ behavior: abs() resolves to C integer abs, truncating to int
+      GSD_Delta_Int : constant Integer :=
+        Integer (Real64'Floor (abs (Acceptable_GSD - GSD)));
+   begin
+      if not First_GSD_Found
+        or else Integer
+                  (Real64'Floor (abs (Acceptable_GSD - Real64 (FP.AchievedGSD))))
+                > GSD_Delta_Int
+      then
+         First_GSD_Found      := True;
+         FP.CameraID          := Camera_ID;
+         FP.GimbalID          := Gimbal_ID;
+         FP.HorizontalFOV     := Real32 (FOV_Deg);
+         FP.AglAltitude       := Real32 (Altitude);
+         FP.GimbalElevation   := Real32 (Elev_Rad / Deg_To_Rad);
+         FP.AspectRatio       := Real32 (Aspect);
+         FP.AchievedGSD       := Real32 (GSD);
+         FP.CameraWavelength  := Camera_Wavelength;
+         Calculate_Sensor_Footprint (FP, Altitude, Elev_Rad, FOV_Rad, Aspect);
+      end if;
+   end Update_Best;
+
+   --------------------
+   -- Process_Camera --
+   --------------------
+
+   procedure Process_Camera
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Camera              : CameraConfig;
+      Gimbal_ID           : Int64;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Slant               : Real64;
+      Altitude            : Real64;
+      Elev_Rad            : Real64;
+      Acceptable_GSD      : Real64)
+   is
+      pragma SPARK_Mode (Off);
+      use all type Real32_Seq;
+      Aspect  : constant Real64 :=
+        (if Camera.VertResolution = 0 then 1.0
+         else Real64 (Camera.HorizResolution)
+              / Real64 (Camera.VertResolution));
+      Min_Res : constant Real64 :=
+        Real64'Min (Real64 (Camera.HorizResolution),
+                    Real64 (Camera.VertResolution));
+   begin
+      if Camera.SupportedWavelengthBand = Eligible_Wavelength
+        or else Eligible_Wavelength = AllAny
+      then
+         if Camera.FieldOfViewMode = Continuous then
+            declare
+               Min_FOV : constant Real64 := Real64 (Camera.MinHorizontalFOV);
+               Max_FOV : constant Real64 := Real64 (Camera.MaxHorizontalFOV);
+               N_FOV   : Natural;
+            begin
+               if Max_FOV >= Min_FOV then
+                  N_FOV :=
+                    Natural
+                      (Real64'Floor
+                         ((Max_FOV - Min_FOV) / HORIZONTAL_FOV_STEP_SIZE_DEG))
+                    + 1;
+                  for FOV_Step in 0 .. N_FOV - 1 loop
+                     Update_Best
+                       (FP, First_GSD_Found,
+                        Min_FOV + Real64 (FOV_Step) * HORIZONTAL_FOV_STEP_SIZE_DEG,
+                        Slant, Min_Res, Acceptable_GSD, Altitude, Elev_Rad,
+                        Aspect, Camera.PayloadID, Camera.SupportedWavelengthBand,
+                        Gimbal_ID);
+                  end loop;
+               end if;
+            end;
+         else
+            --  Discrete mode
+            for FOV_Entry of Camera.DiscreteHFOVList loop
+               Update_Best
+                 (FP, First_GSD_Found,
+                  Real64 (FOV_Entry),
+                  Slant, Min_Res, Acceptable_GSD, Altitude, Elev_Rad,
+                  Aspect, Camera.PayloadID, Camera.SupportedWavelengthBand,
+                  Gimbal_ID);
+            end loop;
+         end if;
+      end if;
+   end Process_Camera;
+
+   ---------------------------------
+   -- Process_Gimbal_At_Elevation --
+   ---------------------------------
+
+   procedure Process_Gimbal_At_Elevation
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Gimbal              : GimbalConfig;
+      Cameras             : CameraConfig_Seq;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Slant               : Real64;
+      Altitude            : Real64;
+      Elev_Rad            : Real64;
+      Acceptable_GSD      : Real64)
+   is
+      pragma SPARK_Mode (Off);
+      use all type Int64_Seq;
+      use all type CameraConfig_Seq;
+   begin
+      for Cam_ID of Gimbal.ContainedPayloadList loop
+         for Camera of Cameras loop
+            if Camera.PayloadID = Cam_ID then
+               Process_Camera
+                 (FP, First_GSD_Found,
+                  Camera, Gimbal.PayloadID,
+                  Eligible_Wavelength, Slant, Altitude, Elev_Rad,
+                  Acceptable_GSD);
+            end if;
+         end loop;
+      end loop;
+   end Process_Gimbal_At_Elevation;
+
+   ----------------------------
+   -- Compute_Elevation_Range --
+   ----------------------------
+
+   procedure Compute_Elevation_Range
+     (Gimbal          : GimbalConfig;
+      Elevation_Angle : Real64;
+      Elev_Min        : out Real64;
+      Elev_Max        : out Real64)
+   is
+      pragma SPARK_Mode (Off);
+   begin
+      Elev_Min := Real64 (Gimbal.MinElevation) * Deg_To_Rad;
+      Elev_Max := Real64 (Gimbal.MaxElevation) * Deg_To_Rad;
+
+      --  Clamp to valid downward-facing range
+      if Elev_Min < ELEV_MIN_BOUND then
+         Elev_Min := ELEV_MIN_BOUND;
+      end if;
+      if Elev_Max > ELEV_MAX_BOUND then
+         Elev_Max := ELEV_MAX_BOUND;
+      end if;
+      if Elev_Max < Elev_Min then
+         Elev_Max := Elev_Min;
+      end if;
+
+      --  Unclamped gimbal: use full elevation range
+      if not Gimbal.IsElevationClamped then
+         Elev_Max := ELEV_MAX_BOUND;
+         Elev_Min := ELEV_MIN_BOUND;
+      end if;
+
+      --  Elevation override: replicate C++ behavior
+      if Elevation_Angle < 0.001 then
+         if Elevation_Angle > Elev_Min then
+            Elev_Min := Elevation_Angle;
+         end if;
+         Elev_Max := Elev_Min;
+      end if;
+   end Compute_Elevation_Range;
+
+   --------------------
+   -- Process_Gimbal --
+   --------------------
+
+   procedure Process_Gimbal
+     (FP                  : in out SensorFootprint_Msg;
+      First_GSD_Found     : in out Boolean;
+      Gimbal              : GimbalConfig;
+      Cameras             : CameraConfig_Seq;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Acceptable_GSD      : Real64;
+      Altitude            : Real64;
+      Elevation_Angle     : Real64)
+   is
+      pragma SPARK_Mode (Off);
+      use Math;
+      Elev_Min : Real64;
+      Elev_Max : Real64;
+      N_Elev   : Natural;
+   begin
+      Compute_Elevation_Range (Gimbal, Elevation_Angle, Elev_Min, Elev_Max);
+
+      --  Only process gimbals pointing downward
+      if Elev_Min < 0.0 then
+         N_Elev :=
+           Natural
+             (Real64'Floor ((Elev_Max - Elev_Min) / GIMBAL_STEP_SIZE_RAD))
+           + 1;
+
+         for Elev_Step in 0 .. N_Elev - 1 loop
+            declare
+               Elev_Rad : constant Real64 :=
+                 Elev_Min + Real64 (Elev_Step) * GIMBAL_STEP_SIZE_RAD;
+               Denom    : constant Real64 := Sin (-Elev_Rad);
+               Slant    : constant Real64 :=
+                 (if abs (Denom) < COMPARISON_TOLERANCE then Altitude
+                  else Altitude / Denom);
+            begin
+               Process_Gimbal_At_Elevation
+                 (FP, First_GSD_Found,
+                  Gimbal, Cameras,
+                  Eligible_Wavelength, Slant, Altitude, Elev_Rad,
+                  Acceptable_GSD);
+            end;
+         end loop;
+      end if;
+   end Process_Gimbal;
+
    ---------------------------
    -- Find_Sensor_Footprint --
    ---------------------------
@@ -115,11 +418,7 @@ package body Sensor_Manager with SPARK_Mode is
       First_GSD_Found     : in out Boolean)
    is
       pragma SPARK_Mode (Off);
-      use Math;
       use all type GimbalConfig_Seq;
-      use all type CameraConfig_Seq;
-      use all type Real32_Seq;
-      use all type Int64_Seq;
 
       Altitude : constant Real64 :=
         (if Altitude_AGL < 0.001 then Real64 (Entity_Cfg.NominalAltitude)
@@ -136,149 +435,10 @@ package body Sensor_Manager with SPARK_Mode is
       end if;
 
       for Gimbal of Entity_Cfg.Gimbals loop
-         declare
-            Elev_Min : Real64;
-            Elev_Max : Real64;
-            N_Elev   : Natural;
-         begin
-            Elev_Min := Real64 (Gimbal.MinElevation) * Deg_To_Rad;
-            Elev_Max := Real64 (Gimbal.MaxElevation) * Deg_To_Rad;
-
-            --  Clamp to valid downward-facing range
-            if Elev_Min < ELEV_MIN_BOUND then
-               Elev_Min := ELEV_MIN_BOUND;
-            end if;
-            if Elev_Max > ELEV_MAX_BOUND then
-               Elev_Max := ELEV_MAX_BOUND;
-            end if;
-            if Elev_Max < Elev_Min then
-               Elev_Max := Elev_Min;
-            end if;
-
-            --  Unclamped gimbal: use full elevation range
-            if not Gimbal.IsElevationClamped then
-               Elev_Max := ELEV_MAX_BOUND;
-               Elev_Min := ELEV_MIN_BOUND;
-            end if;
-
-            --  Elevation override: replicate C++ behavior
-            if Elevation_Angle < 0.001 then
-               if Elevation_Angle > Elev_Min then
-                  Elev_Min := Elevation_Angle;
-               end if;
-               Elev_Max := Elev_Min;
-            end if;
-
-            --  Only process gimbals pointing downward
-            if Elev_Min < 0.0 then
-               N_Elev :=
-                 Natural
-                   (Real64'Floor ((Elev_Max - Elev_Min) / GIMBAL_STEP_SIZE_RAD))
-                 + 1;
-
-               for Elev_Step in 0 .. N_Elev - 1 loop
-                  declare
-                     Elev_Rad : constant Real64 :=
-                       Elev_Min + Real64 (Elev_Step) * GIMBAL_STEP_SIZE_RAD;
-                     Denom    : constant Real64 := Sin (-Elev_Rad);
-                     Slant    : constant Real64 :=
-                       (if abs (Denom) < COMPARISON_TOLERANCE then Altitude
-                        else Altitude / Denom);
-                  begin
-                     for Cam_ID of Gimbal.ContainedPayloadList loop
-                        for Camera of Entity_Cfg.Cameras loop
-                           if Camera.PayloadID = Cam_ID then
-                              if Camera.SupportedWavelengthBand = Eligible_Wavelength
-                                or else Eligible_Wavelength = AllAny
-                              then
-                                 declare
-                                    Aspect  : constant Real64 :=
-                                      (if Camera.VertResolution = 0 then 1.0
-                                       else Real64 (Camera.HorizResolution)
-                                            / Real64 (Camera.VertResolution));
-                                    Min_Res : constant Real64 :=
-                                      Real64'Min
-                                        (Real64 (Camera.HorizResolution),
-                                         Real64 (Camera.VertResolution));
-
-                                    procedure Update_Best (FOV_Deg : Real64) is
-                                       FOV_Rad       : constant Real64 :=
-                                         FOV_Deg * Deg_To_Rad;
-                                       Alpha_Rad     : constant Real64 :=
-                                         (if Min_Res <= 0.0 then Pi / 2.0
-                                          else FOV_Rad / Min_Res);
-                                       GSD           : constant Real64 :=
-                                         Slant * Sin (Alpha_Rad);
-                                       --  Match C++ behavior: abs() resolves to
-                                       --  C integer abs, truncating to int
-                                       GSD_Delta_Int : constant Integer :=
-                                         Integer
-                                           (Real64'Floor
-                                              (abs (Acceptable_GSD - GSD)));
-                                    begin
-                                       if not First_GSD_Found
-                                         or else Integer
-                                                   (Real64'Floor
-                                                      (abs (Acceptable_GSD
-                                                            - Real64
-                                                                (FP.AchievedGSD))))
-                                                   > GSD_Delta_Int
-                                       then
-                                          First_GSD_Found    := True;
-                                          FP.CameraID        := Camera.PayloadID;
-                                          FP.GimbalID        := Gimbal.PayloadID;
-                                          FP.HorizontalFOV   := Real32 (FOV_Deg);
-                                          FP.AglAltitude     := Real32 (Altitude);
-                                          FP.GimbalElevation :=
-                                            Real32 (Elev_Rad / Deg_To_Rad);
-                                          FP.AspectRatio     := Real32 (Aspect);
-                                          FP.AchievedGSD     := Real32 (GSD);
-                                          FP.CameraWavelength :=
-                                            Camera.SupportedWavelengthBand;
-                                          Calculate_Sensor_Footprint
-                                            (FP, Altitude, Elev_Rad,
-                                             FOV_Rad, Aspect);
-                                       end if;
-                                    end Update_Best;
-                                 begin
-                                    if Camera.FieldOfViewMode = Continuous then
-                                       declare
-                                          Min_FOV : constant Real64 :=
-                                            Real64 (Camera.MinHorizontalFOV);
-                                          Max_FOV : constant Real64 :=
-                                            Real64 (Camera.MaxHorizontalFOV);
-                                          N_FOV   : Natural;
-                                       begin
-                                          if Max_FOV >= Min_FOV then
-                                             N_FOV :=
-                                               Natural
-                                                 (Real64'Floor
-                                                    ((Max_FOV - Min_FOV)
-                                                     / HORIZONTAL_FOV_STEP_SIZE_DEG))
-                                               + 1;
-                                             for FOV_Step in 0 .. N_FOV - 1 loop
-                                                Update_Best
-                                                  (Min_FOV
-                                                   + Real64 (FOV_Step)
-                                                   * HORIZONTAL_FOV_STEP_SIZE_DEG);
-                                             end loop;
-                                          end if;
-                                       end;
-                                    else
-                                       --  Discrete mode
-                                       for FOV_Entry of Camera.DiscreteHFOVList loop
-                                          Update_Best (Real64 (FOV_Entry));
-                                       end loop;
-                                    end if;
-                                 end;
-                              end if;
-                           end if;
-                        end loop;
-                     end loop;
-                  end;
-               end loop;
-            end if;
-         end;
+         Process_Gimbal
+           (FP, First_GSD_Found,
+            Gimbal, Entity_Cfg.Cameras,
+            Eligible_Wavelength, Acceptable_GSD, Altitude, Elevation_Angle);
       end loop;
    end Find_Sensor_Footprint;
 

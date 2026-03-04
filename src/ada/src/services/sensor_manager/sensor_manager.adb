@@ -19,26 +19,66 @@ package body Sensor_Manager with SPARK_Mode is
    ELEV_MAX_BOUND               : constant Real64 := -(Pi / 180.0);
    ELEV_MIN_BOUND               : constant Real64 := -(Pi - Pi / 180.0);
 
+   --  Domain-specific subtypes for improved documentation and proof readiness.
+
+   --  Elevation angle in radians, constrained to the downward-pointing half-plane.
+   --  Zero is horizontal; values approach -Pi at the nadir (straight down).
+   subtype Elevation_Rad is Real64 range -Pi .. 0.0;
+
+   --  Elevation angle in radians after full clamping to the valid gimbal range.
+   --  ELEV_MIN_BOUND ≈ −179° and ELEV_MAX_BOUND ≈ −1° (both in radians).
+   subtype Clamped_Elevation_Rad is Elevation_Rad
+      range ELEV_MIN_BOUND .. ELEV_MAX_BOUND;
+
+   --  Horizontal field of view in radians [0, 2π] (full revolution).
+   subtype Horiz_FOV_Rad is Real64 range 0.0 .. 2.0 * Pi;
+
+   --  Horizontal field of view in degrees [0°, 360°] (full revolution).
+   subtype Horiz_FOV_Deg is Real64 range 0.0 .. 360.0;
+
+   --  Altitude above ground level in metres, non-negative.
+   --  Upper bound matches the range of any LMCP Real32 altitude field.
+   subtype Altitude_M is Real64 range 0.0 .. Real64 (Real32'Last);
+
+   --  Slant range from sensor platform to ground target, in metres (non-negative).
+   subtype Slant_M is Real64 range 0.0 .. Real64 (Real32'Last);
+
+   --  Ground sample distance (metres/pixel), non-negative.
+   subtype GSD_T is Real64 range 0.0 .. Real64 (Real32'Last);
+
+   --  Camera aspect ratio (HorizRes / VertRes), non-negative.
+   --  Bounded by UInt32 since both resolution fields are UInt32.
+   subtype Aspect_Ratio_T is Real64 range 0.0 .. Real64 (UInt32'Last);
+
+   --  Minimum camera pixel resolution (min of horizontal and vertical), non-negative.
+   subtype Min_Resolution_T is Real64 range 0.0 .. Real64 (UInt32'Last);
+
+   --  Raw elevation-angle override from a SensorFootprintRequest (degrees, LMCP convention).
+   --  This value is compared against radian-valued gimbal limits in Compute_Elevation_Range,
+   --  faithfully replicating C++ behaviour (intentional unit mismatch).
+   subtype Elevation_Request_Deg is Real64
+      range Real64 (Real32'First) .. Real64 (Real32'Last);
+
    --  Local subprogram declarations
 
    procedure Calculate_Sensor_Footprint
-     (FP            : in out SensorFootprint_Msg;
-      Altitude      : Real64;
-      Elev_Rad      : Real64;
-      Horiz_FOV_Rad : Real64;
-      Aspect_Ratio  : Real64)
+     (FP           : in out SensorFootprint_Msg;
+      Altitude     : Altitude_M;
+      Elev_Rad     : Elevation_Rad;
+      HFOV_Rad     : Horiz_FOV_Rad;
+      Aspect_Ratio : Aspect_Ratio_T)
      with Always_Terminates;
 
    procedure Update_Best
      (FP                : in out SensorFootprint_Msg;
       First_GSD_Found   : in out Boolean;
-      FOV_Deg           : Real64;
-      Slant             : Real64;
-      Min_Res           : Real64;
-      Acceptable_GSD    : Real64;
-      Altitude          : Real64;
-      Elev_Rad          : Real64;
-      Aspect            : Real64;
+      FOV_Deg           : Horiz_FOV_Deg;
+      Slant             : Slant_M;
+      Min_Res           : Min_Resolution_T;
+      Acceptable_GSD    : GSD_T;
+      Altitude          : Altitude_M;
+      Elev_Rad          : Elevation_Rad;
+      Aspect            : Aspect_Ratio_T;
       Camera_ID         : Int64;
       Camera_Wavelength : WavelengthBandEnum;
       Gimbal_ID         : Int64)
@@ -53,10 +93,10 @@ package body Sensor_Manager with SPARK_Mode is
       Camera              : CameraConfig;
       Gimbal_ID           : Int64;
       Eligible_Wavelength : WavelengthBandEnum;
-      Slant               : Real64;
-      Altitude            : Real64;
-      Elev_Rad            : Real64;
-      Acceptable_GSD      : Real64)
+      Slant               : Slant_M;
+      Altitude            : Altitude_M;
+      Elev_Rad            : Elevation_Rad;
+      Acceptable_GSD      : GSD_T)
      with Always_Terminates;
    --  Check wavelength eligibility for Camera, then iterate over its FOV
    --  configurations and call Update_Best for each candidate.
@@ -67,10 +107,10 @@ package body Sensor_Manager with SPARK_Mode is
       Gimbal              : GimbalConfig;
       Cameras             : CameraConfig_Seq;
       Eligible_Wavelength : WavelengthBandEnum;
-      Slant               : Real64;
-      Altitude            : Real64;
-      Elev_Rad            : Real64;
-      Acceptable_GSD      : Real64)
+      Slant               : Slant_M;
+      Altitude            : Altitude_M;
+      Elev_Rad            : Elevation_Rad;
+      Acceptable_GSD      : GSD_T)
      with Always_Terminates;
    --  For a given Gimbal and elevation step (Elev_Rad, Slant already computed),
    --  find cameras in Cameras whose PayloadID matches a ContainedPayloadList
@@ -78,13 +118,18 @@ package body Sensor_Manager with SPARK_Mode is
 
    procedure Compute_Elevation_Range
      (Gimbal          : GimbalConfig;
-      Elevation_Angle : Real64;
-      Elev_Min        : out Real64;
-      Elev_Max        : out Real64)
+      Elevation_Angle : Elevation_Request_Deg;
+      Elev_Min        : out Clamped_Elevation_Rad;
+      Elev_Max        : out Clamped_Elevation_Rad;
+      Valid           : out Boolean)
      with Always_Terminates;
-   --  Convert Gimbal's elevation limits to radians, apply clamping to the
-   --  valid downward-facing range, handle the unclamped case, and apply
-   --  the elevation-angle override (replicating C++ behavior).
+   --  Phase 1: returns Valid = False immediately if IsElevationClamped and
+   --  MinElevation ≥ 0° (gimbal cannot observe the ground).
+   --  Phase 2: two-sided clamps both limits into [ELEV_MIN_BOUND, ELEV_MAX_BOUND],
+   --  fixes any inversion, then applies the elevation-angle override from the
+   --  request (replicating C++ behavior, including its degree/radian unit mismatch).
+   --  Sets Valid := False (and assigns dummy values to Elev_Min/Elev_Max)
+   --  when the gimbal has no downward-facing coverage.
 
    procedure Process_Gimbal
      (FP                  : in out SensorFootprint_Msg;
@@ -92,9 +137,9 @@ package body Sensor_Manager with SPARK_Mode is
       Gimbal              : GimbalConfig;
       Cameras             : CameraConfig_Seq;
       Eligible_Wavelength : WavelengthBandEnum;
-      Acceptable_GSD      : Real64;
-      Altitude            : Real64;
-      Elevation_Angle     : Real64)
+      Acceptable_GSD      : GSD_T;
+      Altitude            : Altitude_M;
+      Elevation_Angle     : Elevation_Request_Deg)
      with Always_Terminates;
    --  Compute the effective elevation range for Gimbal, then iterate over
    --  elevation steps, calling Process_Gimbal_At_Elevation for each.
@@ -114,34 +159,34 @@ package body Sensor_Manager with SPARK_Mode is
    --------------------------------
 
    procedure Calculate_Sensor_Footprint
-     (FP            : in out SensorFootprint_Msg;
-      Altitude      : Real64;
-      Elev_Rad      : Real64;
-      Horiz_FOV_Rad : Real64;
-      Aspect_Ratio  : Real64)
+     (FP           : in out SensorFootprint_Msg;
+      Altitude     : Altitude_M;
+      Elev_Rad     : Elevation_Rad;
+      HFOV_Rad     : Horiz_FOV_Rad;
+      Aspect_Ratio : Aspect_Ratio_T)
    is
       pragma SPARK_Mode (Off);
       use Math;
-      Vert_FOV       : Real64;
-      Gimbal_Max     : Real64;
-      Gimbal_Min     : Real64;
-      Slant_Range    : Real64;
+      Vert_FOV       : Real64;           --  Can exceed 2π for small aspect ratios
+      Gimbal_Max     : Elevation_Rad;
+      Gimbal_Min     : Elevation_Rad;
+      Slant_Range    : Real64;           --  May exceed Real32'Last for extreme inputs
       Horiz_Center   : Real64;
       Horiz_Leading  : Real64;
       Horiz_Trailing : Real64;
-      Width_Center   : Real64;
+      Width_Center   : Real64;           --  Unbounded near FOV = π
       Denom          : Real64;
    begin
       if abs (Aspect_Ratio) < COMPARISON_TOLERANCE then
-         Vert_FOV := Horiz_FOV_Rad;
+         Vert_FOV := HFOV_Rad;
       else
-         Vert_FOV := Horiz_FOV_Rad / Aspect_Ratio;
+         Vert_FOV := HFOV_Rad / Aspect_Ratio;
       end if;
 
       Gimbal_Max :=
-        Real64'Max (-Pi, Real64'Min (0.0, Elev_Rad + Vert_FOV / 2.0));
+        Elevation_Rad (Real64'Max (-Pi, Real64'Min (0.0, Elev_Rad + Vert_FOV / 2.0)));
       Gimbal_Min :=
-        Real64'Max (-Pi, Real64'Min (0.0, Elev_Rad - Vert_FOV / 2.0));
+        Elevation_Rad (Real64'Max (-Pi, Real64'Min (0.0, Elev_Rad - Vert_FOV / 2.0)));
 
       Denom := Sin (-Elev_Rad);
       Slant_Range :=
@@ -163,7 +208,7 @@ package body Sensor_Manager with SPARK_Mode is
         (if abs (Denom) < COMPARISON_TOLERANCE then 0.0
          else Altitude / Denom);
 
-      Width_Center := 2.0 * Slant_Range * Tan (0.5 * Horiz_FOV_Rad);
+      Width_Center := 2.0 * Slant_Range * Tan (0.5 * HFOV_Rad);
 
       FP.SlantRangeToCenter       := Real32 (Slant_Range);
       FP.HorizontalToCenter       := Real32 (Horiz_Center);
@@ -179,20 +224,20 @@ package body Sensor_Manager with SPARK_Mode is
    procedure Update_Best
      (FP                : in out SensorFootprint_Msg;
       First_GSD_Found   : in out Boolean;
-      FOV_Deg           : Real64;
-      Slant             : Real64;
-      Min_Res           : Real64;
-      Acceptable_GSD    : Real64;
-      Altitude          : Real64;
-      Elev_Rad          : Real64;
-      Aspect            : Real64;
+      FOV_Deg           : Horiz_FOV_Deg;
+      Slant             : Slant_M;
+      Min_Res           : Min_Resolution_T;
+      Acceptable_GSD    : GSD_T;
+      Altitude          : Altitude_M;
+      Elev_Rad          : Elevation_Rad;
+      Aspect            : Aspect_Ratio_T;
       Camera_ID         : Int64;
       Camera_Wavelength : WavelengthBandEnum;
       Gimbal_ID         : Int64)
    is
       pragma SPARK_Mode (Off);
       use Math;
-      FOV_Rad       : constant Real64 := FOV_Deg * Deg_To_Rad;
+      FOV_Rad       : constant Horiz_FOV_Rad := FOV_Deg * Deg_To_Rad;
       Alpha_Rad     : constant Real64 :=
         (if Min_Res <= 0.0 then Pi / 2.0
          else FOV_Rad / Min_Res);
@@ -229,18 +274,18 @@ package body Sensor_Manager with SPARK_Mode is
       Camera              : CameraConfig;
       Gimbal_ID           : Int64;
       Eligible_Wavelength : WavelengthBandEnum;
-      Slant               : Real64;
-      Altitude            : Real64;
-      Elev_Rad            : Real64;
-      Acceptable_GSD      : Real64)
+      Slant               : Slant_M;
+      Altitude            : Altitude_M;
+      Elev_Rad            : Elevation_Rad;
+      Acceptable_GSD      : GSD_T)
    is
       pragma SPARK_Mode (Off);
       use all type Real32_Seq;
-      Aspect  : constant Real64 :=
+      Aspect  : constant Aspect_Ratio_T :=
         (if Camera.VertResolution = 0 then 1.0
          else Real64 (Camera.HorizResolution)
               / Real64 (Camera.VertResolution));
-      Min_Res : constant Real64 :=
+      Min_Res : constant Min_Resolution_T :=
         Real64'Min (Real64 (Camera.HorizResolution),
                     Real64 (Camera.VertResolution));
    begin
@@ -249,8 +294,10 @@ package body Sensor_Manager with SPARK_Mode is
       then
          if Camera.FieldOfViewMode = Continuous then
             declare
-               Min_FOV : constant Real64 := Real64 (Camera.MinHorizontalFOV);
-               Max_FOV : constant Real64 := Real64 (Camera.MaxHorizontalFOV);
+               Min_FOV : constant Horiz_FOV_Deg :=
+                 Real64'Max (0.0, Real64'Min (360.0, Real64 (Camera.MinHorizontalFOV)));
+               Max_FOV : constant Horiz_FOV_Deg :=
+                 Real64'Max (0.0, Real64'Min (360.0, Real64 (Camera.MaxHorizontalFOV)));
                N_FOV   : Natural;
             begin
                if Max_FOV >= Min_FOV then
@@ -262,7 +309,8 @@ package body Sensor_Manager with SPARK_Mode is
                   for FOV_Step in 0 .. N_FOV - 1 loop
                      Update_Best
                        (FP, First_GSD_Found,
-                        Min_FOV + Real64 (FOV_Step) * HORIZONTAL_FOV_STEP_SIZE_DEG,
+                        Horiz_FOV_Deg
+                          (Min_FOV + Real64 (FOV_Step) * HORIZONTAL_FOV_STEP_SIZE_DEG),
                         Slant, Min_Res, Acceptable_GSD, Altitude, Elev_Rad,
                         Aspect, Camera.PayloadID, Camera.SupportedWavelengthBand,
                         Gimbal_ID);
@@ -274,7 +322,8 @@ package body Sensor_Manager with SPARK_Mode is
             for FOV_Entry of Camera.DiscreteHFOVList loop
                Update_Best
                  (FP, First_GSD_Found,
-                  Real64 (FOV_Entry),
+                  Horiz_FOV_Deg (Real64'Max (0.0, Real64'Min (360.0,
+                                                               Real64 (FOV_Entry)))),
                   Slant, Min_Res, Acceptable_GSD, Altitude, Elev_Rad,
                   Aspect, Camera.PayloadID, Camera.SupportedWavelengthBand,
                   Gimbal_ID);
@@ -293,10 +342,10 @@ package body Sensor_Manager with SPARK_Mode is
       Gimbal              : GimbalConfig;
       Cameras             : CameraConfig_Seq;
       Eligible_Wavelength : WavelengthBandEnum;
-      Slant               : Real64;
-      Altitude            : Real64;
-      Elev_Rad            : Real64;
-      Acceptable_GSD      : Real64)
+      Slant               : Slant_M;
+      Altitude            : Altitude_M;
+      Elev_Rad            : Elevation_Rad;
+      Acceptable_GSD      : GSD_T)
    is
       pragma SPARK_Mode (Off);
       use all type Int64_Seq;
@@ -321,39 +370,64 @@ package body Sensor_Manager with SPARK_Mode is
 
    procedure Compute_Elevation_Range
      (Gimbal          : GimbalConfig;
-      Elevation_Angle : Real64;
-      Elev_Min        : out Real64;
-      Elev_Max        : out Real64)
+      Elevation_Angle : Elevation_Request_Deg;
+      Elev_Min        : out Clamped_Elevation_Rad;
+      Elev_Max        : out Clamped_Elevation_Rad;
+      Valid           : out Boolean)
    is
       pragma SPARK_Mode (Off);
+      Elev_Min_Raw : Real64 := Real64 (Gimbal.MinElevation) * Deg_To_Rad;
+      Elev_Max_Raw : Real64 := Real64 (Gimbal.MaxElevation) * Deg_To_Rad;
    begin
-      Elev_Min := Real64 (Gimbal.MinElevation) * Deg_To_Rad;
-      Elev_Max := Real64 (Gimbal.MaxElevation) * Deg_To_Rad;
-
-      --  Clamp to valid downward-facing range
-      if Elev_Min < ELEV_MIN_BOUND then
-         Elev_Min := ELEV_MIN_BOUND;
-      end if;
-      if Elev_Max > ELEV_MAX_BOUND then
-         Elev_Max := ELEV_MAX_BOUND;
-      end if;
-      if Elev_Max < Elev_Min then
-         Elev_Max := Elev_Min;
+      --  Phase 1: detect an upward-facing gimbal.
+      --  MinElevation ≥ 0° means the shallowest angle the gimbal can reach is
+      --  horizontal or above — it cannot observe the ground.  Matches the
+      --  explicit C++ guard (SensorManagerService.cpp line 258).
+      if Gimbal.IsElevationClamped and then Elev_Min_Raw >= 0.0 then
+         Valid    := False;
+         Elev_Min := Clamped_Elevation_Rad'First;
+         Elev_Max := Clamped_Elevation_Rad'First;
+         return;
       end if;
 
-      --  Unclamped gimbal: use full elevation range
+      --  Phase 2: compute the valid elevation range for a downward-facing or
+      --  unclamped gimbal.
+
+      --  Unclamped gimbal: sweep the full valid range.
       if not Gimbal.IsElevationClamped then
-         Elev_Max := ELEV_MAX_BOUND;
-         Elev_Min := ELEV_MIN_BOUND;
+         Elev_Min_Raw := ELEV_MIN_BOUND;
+         Elev_Max_Raw := ELEV_MAX_BOUND;
       end if;
 
-      --  Elevation override: replicate C++ behavior
-      if Elevation_Angle < 0.001 then
-         if Elevation_Angle > Elev_Min then
-            Elev_Min := Elevation_Angle;
-         end if;
-         Elev_Max := Elev_Min;
+      --  Two-sided clamp: enforce ELEV_MIN_BOUND ≤ Min ≤ Max ≤ ELEV_MAX_BOUND.
+      --  After Phase 1, Elev_Min_Raw < 0 for clamped gimbals, so the clamp
+      --  keeps Min negative.
+      Elev_Min_Raw :=
+        Real64'Max (ELEV_MIN_BOUND, Real64'Min (ELEV_MAX_BOUND, Elev_Min_Raw));
+      Elev_Max_Raw :=
+        Real64'Max (ELEV_MIN_BOUND, Real64'Min (ELEV_MAX_BOUND, Elev_Max_Raw));
+      if Elev_Max_Raw < Elev_Min_Raw then
+         Elev_Max_Raw := Elev_Min_Raw;
       end if;
+
+      --  Elevation override: if the request pins a specific elevation angle,
+      --  collapse the range to that single angle (or Min, whichever is less
+      --  steep).  Note: Elevation_Angle is in degrees while Elev_Min/Max_Raw
+      --  are in radians — intentional unit mismatch replicating C++ behavior.
+      if Elevation_Angle < 0.001 then
+         if Elevation_Angle > Elev_Min_Raw then
+            Elev_Min_Raw := Elevation_Angle;
+         end if;
+         Elev_Max_Raw := Elev_Min_Raw;
+         --  Re-clamp: override may produce a value in (ELEV_MAX_BOUND, 0.001).
+         Elev_Min_Raw :=
+           Real64'Max (ELEV_MIN_BOUND, Real64'Min (ELEV_MAX_BOUND, Elev_Min_Raw));
+         Elev_Max_Raw := Elev_Min_Raw;
+      end if;
+
+      Valid    := True;
+      Elev_Min := Clamped_Elevation_Rad (Elev_Min_Raw);
+      Elev_Max := Clamped_Elevation_Rad (Elev_Max_Raw);
    end Compute_Elevation_Range;
 
    --------------------
@@ -366,20 +440,21 @@ package body Sensor_Manager with SPARK_Mode is
       Gimbal              : GimbalConfig;
       Cameras             : CameraConfig_Seq;
       Eligible_Wavelength : WavelengthBandEnum;
-      Acceptable_GSD      : Real64;
-      Altitude            : Real64;
-      Elevation_Angle     : Real64)
+      Acceptable_GSD      : GSD_T;
+      Altitude            : Altitude_M;
+      Elevation_Angle     : Elevation_Request_Deg)
    is
       pragma SPARK_Mode (Off);
       use Math;
-      Elev_Min : Real64;
-      Elev_Max : Real64;
+      Elev_Min : Clamped_Elevation_Rad;
+      Elev_Max : Clamped_Elevation_Rad;
+      Valid    : Boolean;
       N_Elev   : Natural;
    begin
-      Compute_Elevation_Range (Gimbal, Elevation_Angle, Elev_Min, Elev_Max);
+      Compute_Elevation_Range (Gimbal, Elevation_Angle, Elev_Min, Elev_Max, Valid);
 
-      --  Only process gimbals pointing downward
-      if Elev_Min < 0.0 then
+      --  Skip upward-facing gimbals (Valid = False), matching C++ behavior.
+      if Valid then
          N_Elev :=
            Natural
              (Real64'Floor ((Elev_Max - Elev_Min) / GIMBAL_STEP_SIZE_RAD))
@@ -387,7 +462,7 @@ package body Sensor_Manager with SPARK_Mode is
 
          for Elev_Step in 0 .. N_Elev - 1 loop
             declare
-               Elev_Rad : constant Real64 :=
+               Elev_Rad : constant Clamped_Elevation_Rad :=
                  Elev_Min + Real64 (Elev_Step) * GIMBAL_STEP_SIZE_RAD;
                Denom    : constant Real64 := Sin (-Elev_Rad);
                Slant    : constant Real64 :=
@@ -397,7 +472,7 @@ package body Sensor_Manager with SPARK_Mode is
                Process_Gimbal_At_Elevation
                  (FP, First_GSD_Found,
                   Gimbal, Cameras,
-                  Eligible_Wavelength, Slant, Altitude, Elev_Rad,
+                  Eligible_Wavelength, Slant_M (Slant), Altitude, Elev_Rad,
                   Acceptable_GSD);
             end;
          end loop;
@@ -420,11 +495,13 @@ package body Sensor_Manager with SPARK_Mode is
       pragma SPARK_Mode (Off);
       use all type GimbalConfig_Seq;
 
+      --  Raw altitude before sanity check; may be negative (NominalAltitude).
+      --  Narrowed to Altitude_M at the call site below, after the sanity check.
       Altitude : constant Real64 :=
         (if Altitude_AGL < 0.001 then Real64 (Entity_Cfg.NominalAltitude)
          else Altitude_AGL);
 
-      Acceptable_GSD : constant Real64 :=
+      Acceptable_GSD : constant GSD_T :=
         (if Desired_GSD < 0.001 then DEFAULT_ACCEPTABLE_GSD
          else Desired_GSD);
 
@@ -438,7 +515,9 @@ package body Sensor_Manager with SPARK_Mode is
          Process_Gimbal
            (FP, First_GSD_Found,
             Gimbal, Entity_Cfg.Cameras,
-            Eligible_Wavelength, Acceptable_GSD, Altitude, Elevation_Angle);
+            Eligible_Wavelength, Acceptable_GSD,
+            Altitude_M (Altitude),
+            Elevation_Request_Deg (Elevation_Angle));
       end loop;
    end Find_Sensor_Footprint;
 

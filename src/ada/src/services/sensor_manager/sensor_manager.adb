@@ -122,7 +122,22 @@ package body Sensor_Manager with SPARK_Mode is
       Elev_Min        : out Clamped_Elevation_Rad;
       Elev_Max        : out Clamped_Elevation_Rad;
       Valid           : out Boolean)
-     with Always_Terminates;
+     with
+       Always_Terminates,
+       Contract_Cases =>
+         --  Upward-facing gimbal: shallowest angle is at or above the horizon,
+         --  so it cannot observe the ground.
+         (Gimbal.IsElevationClamped
+            and then Real64 (Gimbal.MinElevation) * Deg_To_Rad >= 0.0 =>
+              not Valid,
+
+          --  Downward-facing or unclamped gimbal: outputs are clamped to
+          --  [ELEV_MIN_BOUND, ELEV_MAX_BOUND] and ordered Min ≤ Max.
+          others =>
+              Valid
+                and then Elev_Min in ELEV_MIN_BOUND .. ELEV_MAX_BOUND
+                and then Elev_Max in ELEV_MIN_BOUND .. ELEV_MAX_BOUND
+                and then Elev_Min <= Elev_Max);
    --  Phase 1: returns Valid = False immediately if IsElevationClamped and
    --  MinElevation ≥ 0° (gimbal cannot observe the ground).
    --  Phase 2: two-sided clamps both limits into [ELEV_MIN_BOUND, ELEV_MAX_BOUND],
@@ -375,7 +390,6 @@ package body Sensor_Manager with SPARK_Mode is
       Elev_Max        : out Clamped_Elevation_Rad;
       Valid           : out Boolean)
    is
-      pragma SPARK_Mode (Off);
       Elev_Min_Raw : Real64 := Real64 (Gimbal.MinElevation) * Deg_To_Rad;
       Elev_Max_Raw : Real64 := Real64 (Gimbal.MaxElevation) * Deg_To_Rad;
    begin
@@ -418,7 +432,6 @@ package body Sensor_Manager with SPARK_Mode is
          if Elevation_Angle > Elev_Min_Raw then
             Elev_Min_Raw := Elevation_Angle;
          end if;
-         Elev_Max_Raw := Elev_Min_Raw;
          --  Re-clamp: override may produce a value in (ELEV_MAX_BOUND, 0.001).
          Elev_Min_Raw :=
            Real64'Max (ELEV_MIN_BOUND, Real64'Min (ELEV_MAX_BOUND, Elev_Min_Raw));

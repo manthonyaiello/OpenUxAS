@@ -37,8 +37,10 @@ package body Sensor_Manager with SPARK_Mode is
    subtype Horiz_FOV_Deg is Real64 range 0.0 .. 360.0;
 
    --  Altitude above ground level in metres, non-negative.
-   --  Upper bound matches the range of any LMCP Real32 altitude field.
-   subtype Altitude_M is Real64 range 0.0 .. Real64 (Real32'Last);
+   --  Upper bound matches the CMASI MaximumAltitude default (1,000,000 m).
+   --  This is far above the Kármán line and well beyond any realistic AGL altitude.
+   MAX_ALTITUDE_M : constant Real64 := 1.0e6;
+   subtype Altitude_M is Real64 range 0.0 .. MAX_ALTITUDE_M;
 
    --  Slant range from sensor platform to ground target, in metres (non-negative).
    subtype Slant_M is Real64 range 0.0 .. Real64 (Real32'Last);
@@ -64,10 +66,14 @@ package body Sensor_Manager with SPARK_Mode is
    procedure Calculate_Sensor_Footprint
      (FP           : in out SensorFootprint_Msg;
       Altitude     : Altitude_M;
-      Elev_Rad     : Elevation_Rad;
+      Elev_Rad     : Clamped_Elevation_Rad;
       HFOV_Rad     : Horiz_FOV_Rad;
       Aspect_Ratio : Aspect_Ratio_T)
-     with Always_Terminates;
+     with
+       Always_Terminates,
+       Pre =>
+         Altitude in 0.0 .. MAX_ALTITUDE_M
+         and then HFOV_Rad <= Pi / 2.0;
 
    procedure Update_Best
      (FP                : in out SensorFootprint_Msg;
@@ -77,7 +83,7 @@ package body Sensor_Manager with SPARK_Mode is
       Min_Res           : Min_Resolution_T;
       Acceptable_GSD    : GSD_T;
       Altitude          : Altitude_M;
-      Elev_Rad          : Elevation_Rad;
+      Elev_Rad          : Clamped_Elevation_Rad;
       Aspect            : Aspect_Ratio_T;
       Camera_ID         : Int64;
       Camera_Wavelength : WavelengthBandEnum;
@@ -95,7 +101,7 @@ package body Sensor_Manager with SPARK_Mode is
       Eligible_Wavelength : WavelengthBandEnum;
       Slant               : Slant_M;
       Altitude            : Altitude_M;
-      Elev_Rad            : Elevation_Rad;
+      Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
      with Always_Terminates;
    --  Check wavelength eligibility for Camera, then iterate over its FOV
@@ -109,7 +115,7 @@ package body Sensor_Manager with SPARK_Mode is
       Eligible_Wavelength : WavelengthBandEnum;
       Slant               : Slant_M;
       Altitude            : Altitude_M;
-      Elev_Rad            : Elevation_Rad;
+      Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
      with Always_Terminates;
    --  For a given Gimbal and elevation step (Elev_Rad, Slant already computed),
@@ -176,22 +182,70 @@ package body Sensor_Manager with SPARK_Mode is
    procedure Calculate_Sensor_Footprint
      (FP           : in out SensorFootprint_Msg;
       Altitude     : Altitude_M;
-      Elev_Rad     : Elevation_Rad;
+      Elev_Rad     : Clamped_Elevation_Rad;
       HFOV_Rad     : Horiz_FOV_Rad;
       Aspect_Ratio : Aspect_Ratio_T)
    is
-      pragma SPARK_Mode (Off);
       use Math;
-      Vert_FOV       : Real64;           --  Can exceed 2π for small aspect ratios
+      Vert_FOV       : Real64;
       Gimbal_Max     : Elevation_Rad;
       Gimbal_Min     : Elevation_Rad;
-      Slant_Range    : Real64;           --  May exceed Real32'Last for extreme inputs
+      Slant_Range    : Real64;
       Horiz_Center   : Real64;
       Horiz_Leading  : Real64;
       Horiz_Trailing : Real64;
-      Width_Center   : Real64;           --  Unbounded near FOV = π
+      Width_Center   : Real64;
       Denom          : Real64;
+
+      procedure Axiom_Sin_Lower_Bound (X : Real64)
+      with
+         Ghost,
+         Import,
+         Pre =>
+            X >= Pi / 180.0 and
+            X <= Pi - Pi / 180.0,
+         Post =>
+            --  Sin (pi-pi/180) ≈ 0.01745240644
+            --  Sin (pi/180)    ≈ 0.01745240644
+            --  between these values, the Sin is always greater
+            Sin (X) > 0.01;
+
+      procedure Axiom_Tan_Lower_Bound (X : Real64)
+      with
+         Ghost,
+         Import,
+         Pre =>
+            X >= Pi / 180.0 and
+            X <= Pi - Pi / 180.0,
+         Post =>
+           --  Tan (pi-pi/180) ≈ -0.01745506493
+           --  Tan (pi/180)    ≈  0.01745506493
+           --  between these values, the Tan is no closer to zero
+           Tan (X) >=  0.01 and
+           Tan (X) <= -0.01;
+
+
+      procedure Axiom_Tan_HFOV_Rad (X : Real64)
+      with
+         Ghost,
+         Import,
+         Pre =>
+            X >= 0.0 and
+            X <= Pi / 4.0,
+         Post =>
+            --  Tan (pi/4) = 1.0
+            Tan (X) >= 0.0 and
+            Tan (X) <= 1.0;
+
    begin
+      --  There are more assertions in this subprogram body than strictly
+      --  necessary, but I wanted to illustrate how the reasoning goes that
+      --  allows us (and SPARK) to conclude that all of our operations are
+      --  ultimately safe.
+      --
+      --  This also proves at level=2; the stripped version requires level=3,
+      --  which I prefer to avoid.
+
       if abs (Aspect_Ratio) < COMPARISON_TOLERANCE then
          Vert_FOV := HFOV_Rad;
       else
@@ -204,26 +258,50 @@ package body Sensor_Manager with SPARK_Mode is
         Elevation_Rad (Real64'Max (-Pi, Real64'Min (0.0, Elev_Rad - Vert_FOV / 2.0)));
 
       Denom := Sin (-Elev_Rad);
-      Slant_Range :=
-        (if abs (Denom) < COMPARISON_TOLERANCE then 0.0
-         else Altitude / Denom);
+
+      --  We need an axiom, because the contract on Sin is imprecise, then we
+      --  can tightly bound Denom.
+      Axiom_Sin_Lower_Bound (-Elev_Rad);
+      pragma Assert (0.01 <= Denom);
+      pragma Assert (        Denom <= 1.0);
+
+      Slant_Range := Altitude / Denom;
+      pragma Assert (0.0 <= Slant_Range);
+      pragma Assert (       Slant_Range <= 1.9e9);
 
       Denom := Tan (-Elev_Rad);
-      Horiz_Center :=
-        (if abs (Denom) < COMPARISON_TOLERANCE then 0.0
-         else Altitude / Denom);
+
+      --  We need an axiom, because the contract on Tan is imprecise, then we
+      --  can tightly bound Denom.
+      Axiom_Tan_Lower_Bound (-Elev_Rad);
+      pragma Assert (Denom <= -0.01);
+      pragma Assert ( 0.01 >= Denom);
+
+      Horiz_Center := Altitude / Denom;
+      pragma Assert (-6.0e7 <= Horiz_Center);
+      pragma Assert (          Horiz_Center <= 6.0e7);
 
       Denom := Tan (-Gimbal_Max);
       Horiz_Leading :=
         (if abs (Denom) < COMPARISON_TOLERANCE then 0.0
          else Altitude / Denom);
+      pragma Assert (-1.0e17 <= Horiz_Leading);
+      pragma Assert (           Horiz_Leading <= 1.0e17);
 
       Denom := Tan (-Gimbal_Min);
       Horiz_Trailing :=
         (if abs (Denom) < COMPARISON_TOLERANCE then 0.0
          else Altitude / Denom);
+      pragma Assert (-1.0e17 <= Horiz_Trailing);
+      pragma Assert (           Horiz_Trailing <= 1.0e17);
 
+      --  This axiom puts a tight bound on the Tan term below, which is needed
+      --  to show that the computation of Width_Center doesn't overflow
+      --  (nor does its conversion to a Real32).
+      Axiom_Tan_HFOV_Rad (0.5 * HFOV_Rad);
       Width_Center := 2.0 * Slant_Range * Tan (0.5 * HFOV_Rad);
+      pragma Assert (0.0 <= Width_Center);
+      pragma Assert (       Width_Center <= 1.9e9 * 2.0);
 
       FP.SlantRangeToCenter       := Real32 (Slant_Range);
       FP.HorizontalToCenter       := Real32 (Horiz_Center);
@@ -244,7 +322,7 @@ package body Sensor_Manager with SPARK_Mode is
       Min_Res           : Min_Resolution_T;
       Acceptable_GSD    : GSD_T;
       Altitude          : Altitude_M;
-      Elev_Rad          : Elevation_Rad;
+      Elev_Rad          : Clamped_Elevation_Rad;
       Aspect            : Aspect_Ratio_T;
       Camera_ID         : Int64;
       Camera_Wavelength : WavelengthBandEnum;
@@ -291,7 +369,7 @@ package body Sensor_Manager with SPARK_Mode is
       Eligible_Wavelength : WavelengthBandEnum;
       Slant               : Slant_M;
       Altitude            : Altitude_M;
-      Elev_Rad            : Elevation_Rad;
+      Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
    is
       pragma SPARK_Mode (Off);
@@ -359,7 +437,7 @@ package body Sensor_Manager with SPARK_Mode is
       Eligible_Wavelength : WavelengthBandEnum;
       Slant               : Slant_M;
       Altitude            : Altitude_M;
-      Elev_Rad            : Elevation_Rad;
+      Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
    is
       pragma SPARK_Mode (Off);

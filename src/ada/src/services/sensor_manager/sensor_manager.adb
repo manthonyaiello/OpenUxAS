@@ -81,7 +81,9 @@ package body Sensor_Manager with SPARK_Mode is
        Always_Terminates,
        Pre =>
          Altitude in 0.0 .. MAX_ALTITUDE_M
-         and then HFOV_Rad in 0.0 .. Pi - Pi / 180.0;
+         and then HFOV_Rad in 0.0 .. Pi - Pi / 180.0,
+       Post =>
+         FP.AchievedGSD = FP'Old.AchievedGSD;
 
    procedure Update_Best
      (FP                : in out SensorFootprint_Msg;
@@ -101,7 +103,10 @@ package body Sensor_Manager with SPARK_Mode is
             FOV_Deg in 0.0 .. 179.0
             and then
               (not First_GSD_Found
-               or else Real64 (FP.AchievedGSD) in GSD_T);
+               or else Real64 (FP.AchievedGSD) in GSD_T),
+          Post =>
+            not First_GSD_Found
+            or else Real64 (FP.AchievedGSD) in GSD_T;
    --  FOV_Deg must be strictly less than 180 degrees: at 180 deg the horizontal
    --  half-angle reaches 90 deg, making Tan (HFOV/2) undefined (infinite footprint).
    --  When First_GSD_Found is True, FP.AchievedGSD must already be within GSD_T,
@@ -120,7 +125,9 @@ package body Sensor_Manager with SPARK_Mode is
       Altitude            : Altitude_M;
       Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
-     with Always_Terminates;
+     with Always_Terminates,
+          Pre  => not First_GSD_Found or else Real64 (FP.AchievedGSD) in GSD_T,
+          Post => not First_GSD_Found or else Real64 (FP.AchievedGSD) in GSD_T;
    --  Check wavelength eligibility for Camera, then iterate over its FOV
    --  configurations and call Update_Best for each candidate.
 
@@ -211,6 +218,8 @@ package body Sensor_Manager with SPARK_Mode is
       with
          Ghost,
          Import,
+         Global => null,
+         Always_Terminates,
          Pre =>
             X >= Pi / 180.0 and
             X <= Pi - Pi / 180.0,
@@ -224,6 +233,8 @@ package body Sensor_Manager with SPARK_Mode is
       with
          Ghost,
          Import,
+         Global => null,
+         Always_Terminates,
          Pre =>
             X >= Pi / 180.0 and
             X <= Pi - Pi / 180.0,
@@ -239,6 +250,8 @@ package body Sensor_Manager with SPARK_Mode is
       with
          Ghost,
          Import,
+         Global => null,
+         Always_Terminates,
          Pre =>
             X in 0.0 .. (Pi - Pi / 180.0) / 2.0,
          Post =>
@@ -339,22 +352,24 @@ package body Sensor_Manager with SPARK_Mode is
       use Math;
       FOV_Rad : constant Horiz_FOV_Rad := FOV_Deg * Deg_To_Rad;
 
-      --  Axiom: Sin is bounded in [-1, 1] for all inputs; non-negative on [0, Pi].
       procedure Axiom_Sin_Bounded (X : Real64)
       with
          Ghost,
          Import,
+         Global => null,
+         Always_Terminates,
          Pre  => X in 0.0 .. Pi,
          Post => Sin (X) in 0.0 .. 1.0;
+      --  Axiom: Sin is bounded in [-1, 1] for all inputs; non-negative on [0, Pi].
 
-      --  Lemma: multiplying a value in [0, MAX_SLANT_M] by a factor in [0, 1]
-      --  yields a value in [0, MAX_SLANT_M].  Provable by GNATprove from the
-      --  subtype bounds on A and the precondition on B alone.
       procedure Lemma_Product_Le_Slant (A : Slant_M; B : Real64)
       with
          Ghost,
          Pre  => B in 0.0 .. 1.0,
          Post => A * B in 0.0 .. MAX_SLANT_M;
+      --  Lemma: multiplying a value in [0, MAX_SLANT_M] by a factor in [0, 1]
+      --  yields a value in [0, MAX_SLANT_M].  Provable by GNATprove from the
+      --  subtype bounds on A and the precondition on B alone.
 
       procedure Lemma_Product_Le_Slant (A : Slant_M; B : Real64) is null;
 
@@ -414,7 +429,6 @@ package body Sensor_Manager with SPARK_Mode is
       Elev_Rad            : Clamped_Elevation_Rad;
       Acceptable_GSD      : GSD_T)
    is
-      pragma SPARK_Mode (Off);
       use all type Real32_Seq;
       Aspect  : constant Aspect_Ratio_T :=
         (if Camera.VertResolution = 0 then 1.0
@@ -441,6 +455,9 @@ package body Sensor_Manager with SPARK_Mode is
                          ((Max_FOV - Min_FOV) / HORIZONTAL_FOV_STEP_SIZE_DEG))
                     + 1;
                   for FOV_Step in 0 .. N_FOV - 1 loop
+                     pragma Loop_Invariant
+                       (not First_GSD_Found
+                        or else Real64 (FP.AchievedGSD) in GSD_T);
                      declare
                         FOV : constant Real64 :=
                           Min_FOV + Real64 (FOV_Step) * HORIZONTAL_FOV_STEP_SIZE_DEG;
@@ -461,6 +478,9 @@ package body Sensor_Manager with SPARK_Mode is
          else
             --  Discrete mode
             for FOV_Entry of Camera.DiscreteHFOVList loop
+               pragma Loop_Invariant
+                 (not First_GSD_Found
+                  or else Real64 (FP.AchievedGSD) in GSD_T);
                declare
                   FOV : constant Horiz_FOV_Deg :=
                     Horiz_FOV_Deg (Real64'Max (0.0, Real64'Min (360.0,

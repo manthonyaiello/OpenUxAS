@@ -1,0 +1,15 @@
+xfail: true
+xfail_match: "AglAltitude"
+# SM-5: C++ does not update the entity configuration map when a second
+# EntityConfiguration message arrives for an existing entity ID.
+#
+# C++ uses `unordered_map::insert`, which is a no-op if the key already
+# exists.  After sending a second config with NominalAltitude=1500 for an
+# entity already registered with NominalAltitude=200, C++ continues to use
+# NominalAltitude=200 for subsequent footprint requests.
+# Footprint AglAltitude: C++ ≈ 200, Ada ≈ 1500.
+#
+# Ada uses a replacement-insert (equivalent to operator[]) so the second
+# configuration correctly supersedes the first.
+#
+# See tests/cpp/CPP_BUGS.md SM-5 for full analysis.

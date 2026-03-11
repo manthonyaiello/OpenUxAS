@@ -1,0 +1,13 @@
+xfail: true
+# SM-7: VideoStreamHorizontalResolution=0 with nonzero vertical triggers an
+# unguarded divide-by-zero (dAspectRatio=0) in CalculateSensorFootprint.
+#
+# C++ survives via IEEE 754 Inf propagation and angle clamping, producing a
+# footprint with AchievedGSD > 0 but garbage geometry (HorizontalToLeadingEdge=0).
+#
+# Ada's Calculate_Sensor_Footprint has SPARK preconditions requiring the aspect
+# ratio to be positive, so Ada will reject this camera configuration and produce
+# either no footprint or a footprint with AchievedGSD=0.  The exact Ada output
+# depends on where the precondition check is applied.
+#
+# See tests/cpp/CPP_BUGS.md SM-7 for full analysis.

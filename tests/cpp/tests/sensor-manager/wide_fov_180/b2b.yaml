@@ -1,0 +1,11 @@
+xfail: true
+xfail_match: "AchievedGSD"
+# C++ silently processes HFOV = 180° using an IEEE 754 quirk: tan(Pi/2) is
+# not +infinity in double precision (Pi/2 has no exact representation), so
+# C++ produces a very large but finite WidthCenter.
+#
+# Ada correctly rejects HFOV >= 180° in Process_Camera (`if FOV <= 179.0`).
+# This guard is required to keep Tan(HFOV/2) finite and bounded for the SPARK
+# proof of Calculate_Sensor_Footprint.  Ada produces 0 footprints; C++ produces 1.
+#
+# See tests/cpp/CPP_BUGS.md for full analysis.

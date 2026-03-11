@@ -1,0 +1,12 @@
+xfail: true
+xfail_match: "AchievedGSD"
+# C++ silently processes HFOV = 190°.  tan(95°) < 0, so WidthCenter comes
+# out negative -- a geometrically meaningless result that C++ stores without
+# any validation.
+#
+# Ada correctly rejects HFOV >= 180° in Process_Camera (`if FOV <= 179.0`).
+# This guard is required to keep Tan(HFOV/2) bounded and positive for the
+# SPARK proof of Calculate_Sensor_Footprint.  Ada produces 0 footprints;
+# C++ produces 1 with a negative WidthCenter.
+#
+# See tests/cpp/CPP_BUGS.md for full analysis.

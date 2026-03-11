@@ -1,0 +1,13 @@
+xfail: true
+xfail_match: "AchievedGSD"
+# SM-4 Sub-bug A: empty ElevationAngles list triggers wrong behaviour in C++.
+#
+# C++ pushes sentinel 0.0 for an empty list, then the `if (elevationAngle < 0.001)`
+# branch treats 0.0 as a "specified horizontal" elevation, sets min=max=0.0, and
+# the outer guard `if (min < 0.0)` skips the entire gimbal sweep.
+# Result: AchievedGSD = 0.0 (no sensor found).
+#
+# Ada correctly interprets an empty ElevationAngles list as "do a full sweep"
+# and returns AchievedGSD > 0.
+#
+# See tests/cpp/CPP_BUGS.md SM-4 for full analysis.

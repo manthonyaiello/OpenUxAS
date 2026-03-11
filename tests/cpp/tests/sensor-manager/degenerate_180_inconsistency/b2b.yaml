@@ -1,0 +1,17 @@
+xfail: true
+xfail_match: "SlantRangeToCenter"
+# SM-6: inconsistent zero-denominator fallback between GSD calculation and
+# footprint geometry.  This test also relies on SM-1 (strict < clamp) to
+# place the gimbal at exactly -180°.
+#
+# C++ at -180°:
+#   GSD computed using slant = altitude (FindSensorFootPrint fallback) → AchievedGSD > 0
+#   SlantRangeToCenter = 0.0 (CalculateSensorFootprint fallback) → inconsistent
+#
+# Ada clamps MinElevation to ELEV_MIN_BOUND ≈ -179° (SM-1 fix), so the
+# degenerate -180° step is never reached.  Ada's single step at -179° uses
+# sin(179°) ≈ 0.017 ≠ 0, so both AchievedGSD and SlantRangeToCenter are
+# computed consistently from a real slant range.  SlantRangeToCenter > 0
+# in Ada; SlantRangeToCenter = 0.0 in C++.
+#
+# See tests/cpp/CPP_BUGS.md SM-6 (and SM-1) for full analysis.

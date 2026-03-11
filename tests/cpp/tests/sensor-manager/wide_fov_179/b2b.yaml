@@ -1,0 +1,13 @@
+xfail: true
+xfail_match: "GimbalElevation"
+# C++ uses a strict `<` comparison when clamping the gimbal elevation minimum:
+#   gimbalElevationMin_rad = (gimbalElevationMin_rad < -Pi) ? -(Pi - 1°) : gimbalElevationMin_rad
+# With MinElevation = -180°, gimbalElevationMin_rad == -Pi exactly, so the
+# condition is false and the clamp does not fire.  C++ sweeps from -180°.
+#
+# Ada clamps to ELEV_MIN_BOUND = -(Pi - Pi/180) = -179° unconditionally, so
+# Ada sweeps from -179°.  The sequences are offset by 1°; both find the same
+# |GSD - desired| = 0 at their respective first matching step, but those steps
+# are 1° apart (e.g. C++ picks -150°, Ada picks -149°).
+#
+# See tests/cpp/CPP_BUGS.md for full analysis.

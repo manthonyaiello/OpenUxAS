@@ -171,6 +171,14 @@ silently keeps the *first* configuration; the Ada service replaces the
 stored configuration with the update. (Pre-existing Ada behavior, now
 documented and pinned by the `entity_configuration_update` b2b test.)
 
+**D10 — The response footprint sequence is capped at its index type's
+range.** Footprints beyond `Positive'Last` (2³¹−1) per response are dropped;
+C++ grows its vector unboundedly. Unlike D1-D9 this divergence is not
+covered by a b2b test: reaching the cap would require a request whose
+dimension product exceeds 2×10⁹ footprints (hundreds of gigabytes of
+response), which neither implementation could serialize. The guard exists
+to make `Handle_SensorFootprintRequests` total and provable.
+
 ## Behaviors deliberately kept bug-compatible with C++
 
 These are C++ quirks that the Ada implementation *preserves*, because
@@ -193,6 +201,46 @@ existing b2b tests pin them and they are not in scope of the mandated fixes:
   boresight itself the guards were *dropped*: over `Working_Elevation_Rad`
   both `Sin(−E)` and `Tan(−E)` are bounded away from zero by construction,
   which is the point of the subtype.
+
+## Proof architecture
+
+All Sensor Manager subprograms are proved to SPARK Silver (absence of
+runtime errors, plus the light functional contracts on the sweep and
+candidate math) at `--level=2`, resting on two kinds of deliberately
+unproved leaves:
+
+- **Boundary functions** (`Is_Finite`, `Is_Below_Nominal_Threshold` in
+  `Sensor_Manager_Types`): SPARK's floating-point model has no NaN or
+  infinities, so the predicates that classify raw wire values are
+  `SPARK_Mode (Off)` bodies. They answer Boolean questions about a
+  possibly special value without letting it into SPARK code; every
+  conversion of a wire `Real32` into working `Real64` math is guarded by
+  them.
+
+- **Trigonometric axioms** (`Sensor_Manager_Trig`): GNATprove has no
+  theory of `Sin`/`Tan` (the runtime's elementary functions carry no
+  postconditions), so the four facts the geometry needs are ghost
+  procedures whose null bodies are `SPARK_Mode (Off)`; their
+  postconditions are *assumed* at call sites, not proved. Each is
+  justified in the spec by elementary real analysis over its
+  precondition interval, with numeric margins (≥ 10⁻⁵) that generously
+  absorb libm implementation error (a few ulps, ~10⁻¹⁵ at these
+  magnitudes):
+
+  | Axiom | Fact |
+  |-------|------|
+  | `Axiom_Sin_Bounds_On_Working_Range` | sin(x) ∈ [0.0174, 1] on [1°, 179°] |
+  | `Axiom_Sin_Bounds_On_Half_Turn` | sin(x) ∈ [0, 1] on [0, π] |
+  | `Axiom_Tan_Magnitude_On_Working_Range` | \|tan(x)\| ≥ 0.0174 on [1°, 179°] |
+  | `Axiom_Tan_Bounds_Below_Vertical` | tan(x) ∈ [0, 115] on [0, 1.5621] |
+
+  In debug builds (`-gnata`) the postconditions are compiled and
+  evaluated, so the axioms are exercised at run time rather than
+  blindly trusted.
+
+The proof replays via `tests/proof/proofs/sensor_manager` (the
+`Width_Center` multiplication needs a 120 s prover timeout when proved
+from scratch with `--no-replay`).
 
 ## Test strategy
 

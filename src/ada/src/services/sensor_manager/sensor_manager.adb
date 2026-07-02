@@ -1,11 +1,9 @@
-with Ada.Numerics.Generic_Elementary_Functions;
 with Sensor_Manager_Types; use Sensor_Manager_Types;
+with Sensor_Manager_Trig;  use Sensor_Manager_Trig;
 
 package body Sensor_Manager with SPARK_Mode is
 
    use Ada.Containers;
-
-   package Math is new Ada.Numerics.Generic_Elementary_Functions (Real64);
 
    --  Tolerance of the guarded divisions in Calculate_Sensor_Footprint,
    --  matching the C++ double comparison; it is reachable only for the
@@ -29,8 +27,7 @@ package body Sensor_Manager with SPARK_Mode is
       Desired_GSD_Wire    : Real32;
       Altitude_Wire       : Real32;
       Elevation_Wire      : Real32;
-      FP                  : in out SensorFootprint_Msg;
-      First_GSD_Found     : in out Boolean)
+      FP                  : in out SensorFootprint_Msg)
      with Always_Terminates;
 
    --------------------------------
@@ -44,14 +41,13 @@ package body Sensor_Manager with SPARK_Mode is
       Horiz_FOV    : FOV_Deg;
       Aspect_Ratio : Aspect_Ratio_T)
    is
-      pragma SPARK_Mode (Off);  --  elementary-function calls
-      use Math;
-
       function Guarded_Ratio (Denom : Real64) return Edge_Distance_M is
         (if abs Denom < Comparison_Tolerance then 0.0
          else Real64 (Altitude) / Denom);
 
       Horiz_FOV_Rad : constant Real64 := Real64 (To_Radians (Horiz_FOV));
+      Half_FOV_Rad  : constant Real64 := 0.5 * Horiz_FOV_Rad;
+      Neg_Elev      : constant Real64 := -Real64 (Elev);
 
       --  Aspect_Ratio_T is bounded away from zero, so the C++ guard
       --  against a zero aspect ratio is not needed.
@@ -64,21 +60,32 @@ package body Sensor_Manager with SPARK_Mode is
       Gimbal_Min : constant Real64 :=
         Real64'Max (-Pi, Real64'Min (0.0, Real64 (Elev) - Vert_FOV / 2.0));
 
+      Slant_To_Center : constant Slant_Range_M :=
+        Slant_Range (Altitude, Elev);
+
+      Horiz_Center   : Center_Distance_M;
+      Horiz_Leading  : Edge_Distance_M;
+      Horiz_Trailing : Edge_Distance_M;
+      Width_Center   : Width_M;
+   begin
       --  Over the working elevation range Sin and Tan of -Elev are
       --  bounded away from zero, so center distances need no guard.
-      Slant_To_Center : constant Slant_Range_M   :=
-        Slant_Range (Altitude, Elev);
-      Horiz_Center    : constant Center_Distance_M :=
-        Real64 (Altitude) / Tan (-Real64 (Elev));
+      Axiom_Tan_Magnitude_On_Working_Range (Neg_Elev);
+      Horiz_Center := Real64 (Altitude) / Tan (Neg_Elev);
 
-      Horiz_Leading  : constant Edge_Distance_M :=
-        Guarded_Ratio (Tan (-Gimbal_Max));
-      Horiz_Trailing : constant Edge_Distance_M :=
-        Guarded_Ratio (Tan (-Gimbal_Min));
+      Horiz_Leading  := Guarded_Ratio (Tan (-Gimbal_Max));
+      Horiz_Trailing := Guarded_Ratio (Tan (-Gimbal_Min));
 
-      Width_Center : constant Width_M :=
-        2.0 * Real64 (Slant_To_Center) * Tan (0.5 * Horiz_FOV_Rad);
-   begin
+      Axiom_Tan_Bounds_Below_Vertical (Half_FOV_Rad);
+      declare
+         Tan_Half_FOV : constant Real64 := Tan (Half_FOV_Rad);
+         Two_Slant    : constant Real64 :=
+           2.0 * Real64 (Slant_To_Center);
+      begin
+         pragma Assert (Two_Slant in 0.0 .. 2.0 * Slant_Range_M'Last);
+         Width_Center := Two_Slant * Tan_Half_FOV;
+      end;
+
       FP.SlantRangeToCenter       := Real32 (Slant_To_Center);
       FP.HorizontalToCenter       := Real32 (Horiz_Center);
       FP.HorizontalToLeadingEdge  := Real32 (Horiz_Leading);
@@ -96,14 +103,15 @@ package body Sensor_Manager with SPARK_Mode is
       Desired_GSD_Wire    : Real32;
       Altitude_Wire       : Real32;
       Elevation_Wire      : Real32;
-      FP                  : in out SensorFootprint_Msg;
-      First_GSD_Found     : in out Boolean)
+      FP                  : in out SensorFootprint_Msg)
    is
       Altitude : constant Altitude_Result :=
         Effective_Altitude (Altitude_Wire, Entity_Cfg.NominalAltitude);
 
       Acceptable_GSD : constant Desired_GSD_M :=
         Effective_Desired_GSD (Desired_GSD_Wire);
+
+      First_GSD_Found : Boolean := False;
 
       --  Best GSD so far, tracked in full precision: FP.AchievedGSD is
       --  Real32 on the wire, and comparing a fresh Real64 candidate
@@ -280,47 +288,46 @@ package body Sensor_Manager with SPARK_Mode is
    ------------------------------------
 
    procedure Handle_SensorFootprintRequests
-     (State   : in out Sensor_Manager_State;
+     (State   : Sensor_Manager_State;
       Mailbox : in out Sensor_Manager_Mailbox;
       Msg     : SensorFootprintRequests_Msg)
    is
-      pragma SPARK_Mode (Off);
       use Entity_Config_Maps;
 
       --  Empty request dimensions take a single default element (the
       --  0.0 / AllAny "unspecified" sentinels), as in C++.
 
       function Defaulted (Seq : Real32_Seq) return Real32_Seq is
-        (if Natural (Last (Seq)) = 0 then Add (Empty_Sequence, 0.0)
+        (if Last (Seq) = 0 then Add (Empty_Sequence, 0.0)
          else Seq);
 
       function Defaulted (Seq : WavelengthBand_Seq) return WavelengthBand_Seq
       is
-        (if Natural (Last (Seq)) = 0 then Add (Empty_Sequence, AllAny)
+        (if Last (Seq) = 0 then Add (Empty_Sequence, AllAny)
          else Seq);
 
       procedure Process_Request
-        (Request  : FootprintRequest_Msg;
-         Response : in out SensorFootprintResponse_Msg);
+        (Entity_Cfg : EntityConfig;
+         Request    : FootprintRequest_Msg;
+         Response   : in out SensorFootprintResponse_Msg)
+        with Always_Terminates;
 
       ---------------------
       -- Process_Request --
       ---------------------
 
       procedure Process_Request
-        (Request  : FootprintRequest_Msg;
-         Response : in out SensorFootprintResponse_Msg)
+        (Entity_Cfg : EntityConfig;
+         Request    : FootprintRequest_Msg;
+         Response   : in out SensorFootprintResponse_Msg)
       is
-         Entity_Cfg : constant EntityConfig :=
-           Element (State.Entity_Configs, Request.VehicleID);
       begin
          for W of Defaulted (Request.EligibleWavelengths) loop
             for G of Defaulted (Request.GroundSampleDistances) loop
                for A of Defaulted (Request.AglAltitudes) loop
                   for E of Defaulted (Request.ElevationAngles) loop
                      declare
-                        FP              : SensorFootprint_Msg;
-                        First_GSD_Found : Boolean := False;
+                        FP : SensorFootprint_Msg;
                      begin
                         FP.FootprintResponseID := Request.FootprintRequestID;
                         FP.VehicleID           := Entity_Cfg.ID;
@@ -330,10 +337,16 @@ package body Sensor_Manager with SPARK_Mode is
                            Desired_GSD_Wire    => G,
                            Altitude_Wire       => A,
                            Elevation_Wire      => E,
-                           FP                  => FP,
-                           First_GSD_Found     => First_GSD_Found);
-                        Response.Footprints :=
-                          Add (Response.Footprints, FP);
+                           FP                  => FP);
+                        --  D10: the response sequence is capped at its
+                        --  index type's range; footprints beyond
+                        --  Positive'Last are dropped (unreachable in
+                        --  practice: such a response could not be
+                        --  serialized anyway).
+                        if Last (Response.Footprints) < Positive'Last then
+                           Response.Footprints :=
+                             Add (Response.Footprints, FP);
+                        end if;
                      end;
                   end loop;
                end loop;
@@ -347,7 +360,11 @@ package body Sensor_Manager with SPARK_Mode is
 
       for Request of Msg.Footprints loop
          if Contains (State.Entity_Configs, Request.VehicleID) then
-            Process_Request (Request, Response);
+            Process_Request
+              (Entity_Cfg => Element (State.Entity_Configs,
+                                      Request.VehicleID),
+               Request    => Request,
+               Response   => Response);
          end if;
       end loop;
 

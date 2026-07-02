@@ -1,2 +1,3 @@
-filenames: ["sensor_manager.ads", "sensor_manager_types.ads"]
+filenames: ["sensor_manager.ads", "sensor_manager_types.ads", "sensor_manager_trig.ads"]
 level: 2
+timeout: 120

@@ -1,8 +1,6 @@
-with Ada.Numerics.Generic_Elementary_Functions;
+with Sensor_Manager_Trig; use Sensor_Manager_Trig;
 
 package body Sensor_Manager_Types with SPARK_Mode is
-
-   package Math is new Ada.Numerics.Generic_Elementary_Functions (Real64);
 
    --  Clamp a finite wire elevation into the documented CMASI range.
    function Clamped_Elevation (Wire : Real32) return Elevation_Deg is
@@ -27,6 +25,18 @@ package body Sensor_Manager_Types with SPARK_Mode is
       --  NaN fails X = X; infinities fail the range comparisons.
       return X = X and then X >= Real32'First and then X <= Real32'Last;
    end Is_Finite;
+
+   --------------------------------
+   -- Is_Below_Nominal_Threshold --
+   --------------------------------
+
+   function Is_Below_Nominal_Threshold (X : Real32) return Boolean is
+      pragma SPARK_Mode (Off);  --  X may be NaN or infinite here
+   begin
+      --  NaN compares False, -Inf compares True, exactly like the
+      --  C++ "altitude < 0.001" test this mirrors.
+      return X < 0.001;
+   end Is_Below_Nominal_Threshold;
 
    ------------------------
    -- Gimbal_Sweep_Range --
@@ -281,37 +291,37 @@ package body Sensor_Manager_Types with SPARK_Mode is
    -- Effective_Altitude --
    ------------------------
 
+   --  D6: the gate is membership in [10 m, 100 km]; C++ checks only
+   --  the 10 m floor (and so happily plans at +Inf altitude).
+   function Gated_Altitude (Alt : Real64) return Altitude_Result is
+     (if Alt >= Assigned_Altitude_M'First
+        and then Alt <= Assigned_Altitude_M'Last
+      then (Valid => True, Value => Alt)
+      else (others => <>));
+
    function Effective_Altitude
      (Wire_M    : Real32;
       Nominal_M : Real32) return Altitude_Result
    is
-      pragma SPARK_Mode (Off);  --  wire values may be NaN or infinite
-      Invalid : constant Altitude_Result := (others => <>);
-      Alt     : Real64 := Real64 (Wire_M);
    begin
-      --  NaN requests fail the C++ altitude gate too (NaN >= 10 is
-      --  false); reproduce that as an invalid result.
-      if Alt /= Alt then
-         return Invalid;
-      end if;
-
       --  C++ rule: below the 0.001 threshold (which includes the 0.0
       --  "use nominal" sentinel, negatives and -Inf), substitute the
-      --  entity's nominal altitude.
-      if Alt < 0.001 then
-         Alt := Real64 (Nominal_M);
-      end if;
+      --  entity's nominal altitude. A non-finite nominal (like any
+      --  out-of-range one) fails the gate.
+      if Is_Below_Nominal_Threshold (Wire_M) then
+         return
+           (if Is_Finite (Nominal_M)
+            then Gated_Altitude (Real64 (Nominal_M))
+            else (others => <>));
 
-      --  D6: the gate is membership in [10 m, 100 km]; C++ checks only
-      --  the 10 m floor (and so happily plans at +Inf altitude).
-      if Alt /= Alt
-        or else Alt < Assigned_Altitude_M'First
-        or else Alt > Assigned_Altitude_M'Last
-      then
-         return Invalid;
-      end if;
+      elsif Is_Finite (Wire_M) then
+         return Gated_Altitude (Real64 (Wire_M));
 
-      return (Valid => True, Value => Alt);
+      else
+         --  NaN (fails the C++ altitude gate too: NaN >= 10 is false)
+         --  or +Inf (above the D6 ceiling).
+         return (others => <>);
+      end if;
    end Effective_Altitude;
 
    ---------------------------
@@ -319,17 +329,21 @@ package body Sensor_Manager_Types with SPARK_Mode is
    ---------------------------
 
    function Effective_Desired_GSD (Wire_M : Real32) return Desired_GSD_M is
-      pragma SPARK_Mode (Off);  --  wire values may be NaN or infinite
-      GSD : constant Real64 := Real64 (Wire_M);
    begin
       --  D8: non-finite values take the default, like the sub-threshold
       --  values do in C++ (whose comparison chain they would poison).
-      if GSD /= GSD or else GSD < Desired_GSD_M'First
-        or else GSD > Real64 (Real32'Last)
-      then
+      if not Is_Finite (Wire_M) then
          return Default_Acceptable_GSD;
       end if;
-      return Real64'Min (GSD, Desired_GSD_M'Last);
+
+      declare
+         GSD : constant Real64 := Real64 (Wire_M);
+      begin
+         if GSD < Desired_GSD_M'First then
+            return Default_Acceptable_GSD;
+         end if;
+         return Real64'Min (GSD, Desired_GSD_M'Last);
+      end;
    end Effective_Desired_GSD;
 
    -----------------
@@ -340,12 +354,13 @@ package body Sensor_Manager_Types with SPARK_Mode is
      (Altitude : Assigned_Altitude_M;
       Elev     : Working_Elevation_Rad) return Slant_Range_M
    is
-      pragma SPARK_Mode (Off);  --  elementary-function call
+      Neg_Elev : constant Real64 := -Real64 (Elev);
    begin
       --  Sin (-Elev) is in [sin (1 deg), 1] over the working range, so
       --  the division needs no guard: the result is within
       --  [Altitude, Altitude / sin (1 deg)].
-      return Real64 (Altitude) / Math.Sin (-Real64 (Elev));
+      Axiom_Sin_Bounds_On_Working_Range (Neg_Elev);
+      return Real64 (Altitude) / Sin (Neg_Elev);
    end Slant_Range;
 
    -----------------
@@ -357,7 +372,6 @@ package body Sensor_Manager_Types with SPARK_Mode is
       FOV     : FOV_Deg;
       Min_Res : Pixel_Count) return Achieved_GSD_M
    is
-      pragma SPARK_Mode (Off);  --  elementary-function call
       Alpha : constant Real64 :=
         (if Min_Res = 0
          then Pi / 2.0    --  C++ worst case for unknown resolution
@@ -365,7 +379,8 @@ package body Sensor_Manager_Types with SPARK_Mode is
    begin
       --  Alpha is in (0, Pi), so Sin (Alpha) is in (0, 1] and the
       --  result cannot exceed the slant range.
-      return Real64 (Slant) * Math.Sin (Alpha);
+      Axiom_Sin_Bounds_On_Half_Turn (Alpha);
+      return Real64 (Slant) * Sin (Alpha);
    end Compute_GSD;
 
 end Sensor_Manager_Types;

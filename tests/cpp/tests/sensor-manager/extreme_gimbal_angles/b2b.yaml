@@ -1,0 +1,12 @@
+# Deliberate divergence exemplar for SUBTYPES.md D2/D4 (see
+# src/ada/src/services/sensor_manager/SUBTYPES.md).
+#
+# With ElevationAngles=[-45.0], C++'s degrees-vs-radians pinning evaluates
+# gimbal 1 at its clamped minimum (-179 deg: the "nonsense gimbal angle")
+# and gimbal 2 at -60 deg; Ada evaluates both at the requested -45 deg.
+xfail: true
+xfail_match: "GimbalElevation"
+xfail_reason: >
+  C++ evaluates at the clamped gimbal minimum (down to -179 deg) instead
+  of the requested -45 deg because it compares degrees against radians;
+  Ada converts units correctly (SUBTYPES.md D2, D4).

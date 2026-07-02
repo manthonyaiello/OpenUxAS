@@ -31,7 +31,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
             SupportedWavelengthBand=1,
-            FieldOfViewMode=1,
+            FieldOfViewMode=0,
             randomize=True
         )
 

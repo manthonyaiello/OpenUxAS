@@ -1,0 +1,10 @@
+# Continuous FOV range boundary (SUBTYPES.md D5). Footprints 0-1 agree;
+# footprints 2-3 diverge: C++ enumerates zero and negative FOV candidates
+# and selects them (negative or zero GSD), Ada filters the same grid to
+# (0, 179] degrees.
+xfail: true
+xfail_match: "Footprints[2]"
+xfail_reason: >
+  C++ selects zero/negative FOV candidates from continuous ranges
+  reaching below zero; Ada filters the grid to (0, 179] degrees
+  (SUBTYPES.md D5).

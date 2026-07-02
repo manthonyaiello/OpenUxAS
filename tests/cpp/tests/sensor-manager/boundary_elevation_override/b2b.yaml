@@ -1,0 +1,11 @@
+# Boundary exploration of the elevation override (SUBTYPES.md D2/D3).
+# Footprints 0 and 6-9 agree; footprints 1-5 deliberately diverge: C++
+# compares the requested degrees against radian limits (pinning to the
+# gimbal minimum or interpreting the raw value as radians), Ada converts
+# and clamps into the working and gimbal ranges.
+xfail: true
+xfail_match: "Footprints[1]"
+xfail_reason: >
+  Requested elevations between the gimbal minimum (in radians) and zero
+  are mis-pinned or misinterpreted as radians by C++ (SUBTYPES.md D2/D3);
+  Ada converts degrees correctly.

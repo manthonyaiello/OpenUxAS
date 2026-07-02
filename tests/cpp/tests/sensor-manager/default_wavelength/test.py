@@ -31,7 +31,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
             SupportedWavelengthBand=1,  # EO (specific wavelength)
-            FieldOfViewMode=1,
+            FieldOfViewMode=0,
             randomize=True
         )
 
@@ -53,7 +53,9 @@ with Server(bridge_cfg=bridge_cfg) as server:
             FootprintRequestID=1,
             VehicleID=400,
             EligibleWavelengths=[],  # Empty - should default to AllAny
-            GroundSampleDistances=[5.0],
+            GroundSampleDistances=[0.1],
+            AglAltitudes=[1000.0],
+            ElevationAngles=[-80.0],
             randomize=True
         )
 

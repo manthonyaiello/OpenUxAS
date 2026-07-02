@@ -1,0 +1,10 @@
+# Upper working-elevation bound (SUBTYPES.md D4). Footprints 0-1 agree;
+# footprint 2 (fixed gimbal at -0.5 deg) diverges: C++ evaluates there
+# (slant range doubling for every halving of the angle), Ada clamps the
+# sweep to -1 deg.
+xfail: true
+xfail_match: "Footprints[2]"
+xfail_reason: >
+  C++ leaves a gimbal max elevation in (-1 deg, 0] unclamped and computes
+  a near-horizontal footprint; Ada clamps to the -1 deg working bound
+  (SUBTYPES.md D4).

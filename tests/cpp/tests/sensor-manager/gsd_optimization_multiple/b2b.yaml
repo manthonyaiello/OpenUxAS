@@ -1,0 +1,13 @@
+# Deliberate divergence exemplar for SUBTYPES.md D1 (see
+# src/ada/src/services/sensor_manager/SUBTYPES.md).
+#
+# Both implementations evaluate at the pinned -80 deg elevation, but all
+# candidate GSD deltas from the desired 5.0 m/px lie in the same integer
+# bucket, so C++ (whose abs resolves to the C integer abs) keeps the first
+# FOV candidate (10 deg) while Ada selects the FOV whose GSD is genuinely
+# closest to the desired value (50 deg).
+xfail: true
+xfail_match: "HorizontalFOV"
+xfail_reason: >
+  C++ truncates GSD deltas to integers before comparing (C integer abs),
+  keeping the first FOV candidate; Ada optimizes for real (SUBTYPES.md D1).

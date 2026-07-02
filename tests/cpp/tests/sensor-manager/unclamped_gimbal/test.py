@@ -33,7 +33,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=1080,
             SupportedWavelengthBand=1,  # EO
-            FieldOfViewMode=1,  # Continuous
+            FieldOfViewMode=0,  # Continuous
             randomize=True
         )
 
@@ -48,9 +48,11 @@ with Server(bridge_cfg=bridge_cfg) as server:
         server.send_msg(vehicle_config)
         time.sleep(0.2)
 
-        # ElevationAngles=[-45.0] is required to enter the GSD calculation loop.
-        # With an unclamped gimbal, the service first sets the range to [-179°, -1°]
-        # (lines 249-250), then pins to -45° because -45 is within that range.
+        # ElevationAngles is pinned at -179.0, the lower end of the working
+        # range an unclamped gimbal is given. Both implementations pin the
+        # sweep there (C++ because the raw degree value is below the radian
+        # minimum, SUBTYPES.md D2; Ada by converting and clamping), so the
+        # extreme backward-looking geometry is compared for real.
         footprint_request = Object(
             class_name='task.FootprintRequest',
             FootprintRequestID=1,
@@ -58,7 +60,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             EligibleWavelengths=[1],
             GroundSampleDistances=[5.0],
             AglAltitudes=[1000.0],
-            ElevationAngles=[-45.0],
+            ElevationAngles=[-179.0],
             randomize=True
         )
 

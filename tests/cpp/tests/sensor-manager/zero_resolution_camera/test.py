@@ -59,7 +59,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             EligibleWavelengths=[1],
             GroundSampleDistances=[5.0],
             AglAltitudes=[1000.0],
-            ElevationAngles=[-45.0],
+            ElevationAngles=[-80.0],
             randomize=True
         )
 

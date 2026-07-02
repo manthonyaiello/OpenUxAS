@@ -1,0 +1,8 @@
+# Assigned-altitude gate boundary (SUBTYPES.md D6). Footprints 0-3
+# agree; footprint 4 (100,001 m) diverges: C++ checks only the 10 m
+# floor, Ada also enforces the 100 km ceiling.
+xfail: true
+xfail_match: "Footprints[4]"
+xfail_reason: >
+  C++ computes footprints for altitudes above 100 km; the Ada
+  Assigned_Altitude_M gate rejects them (SUBTYPES.md D6).

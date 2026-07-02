@@ -1,0 +1,10 @@
+# Video-resolution boundary (SUBTYPES.md D7). Footprints 0-1 agree;
+# footprint 2 diverges (C++ uses 70,000 px raw, Ada clamps to 65,536)
+# and footprint 3 differs only in the reported AspectRatio (C++ 0.0 for
+# a zero-width camera, Ada 1.0 -- the geometry is identical).
+xfail: true
+xfail_match: "Footprints[2]"
+xfail_reason: >
+  C++ uses out-of-range resolutions raw and reports aspect 0.0 for
+  zero-width cameras; Ada clamps to 65,536 px and reports 1.0
+  (SUBTYPES.md D7).

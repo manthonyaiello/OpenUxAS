@@ -1,0 +1,9 @@
+# Lower working-elevation bound (SUBTYPES.md D4). Footprints 0 and 3
+# agree; footprints 1 (-179.5 deg kept by C++) and 2 (-180 deg exactly,
+# degenerate trigonometry in C++) diverge from Ada's clamp to -179 deg.
+xfail: true
+xfail_match: "Footprints[1]"
+xfail_reason: >
+  C++ evaluates gimbal minima in [-180, -179) deg unclamped, including
+  the degenerate -180 deg case; Ada clamps to the -179 deg working bound
+  (SUBTYPES.md D4).

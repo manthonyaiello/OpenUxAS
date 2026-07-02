@@ -4,9 +4,29 @@ This directory contains comprehensive unit tests for the SensorManagerService, c
 
 ## Overview
 
-- **Total Tests**: 17
+- **Total Tests**: 30 (23 functional plus 7 `boundary_*` tests)
 - **Requirements Coverage**: ~72% (38 explicitly tested + 25+ implicitly verified)
 - **Total Requirements**: 87 (documented in REQUIREMENTS.md)
+
+## Back-to-back mode and deliberate divergences
+
+The Ada Sensor Manager deliberately diverges from the C++ implementation in
+documented ways (units handling, GSD selection, value sanitization); see
+`src/ada/src/services/sensor_manager/SUBTYPES.md` for the complete list
+(D1-D9) and the test strategy. Consequences for this suite:
+
+- Every test pins all four `FootprintRequest` arrays explicitly. Fields
+  left unset are filled with random values by `randomize=True`, which makes
+  back-to-back comparison nondeterministic now that the implementations
+  legitimately differ.
+- Most functional tests choose request values on which both
+  implementations agree (elevation pinned at the gimbal minimum, desired
+  GSD below all achievable candidates) so real footprint geometry is
+  compared.
+- Tests that exercise a documented divergence carry a `b2b.yaml` with
+  `xfail` and a tight `xfail_match`; the `boundary_*` tests probe each
+  numeric boundary just before, at, and across it, with
+  implementation-aware assertions (`UXAS_IMPL`).
 
 ## Test Organization
 

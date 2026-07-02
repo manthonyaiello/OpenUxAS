@@ -1,0 +1,14 @@
+# Deliberate divergence exemplar for SUBTYPES.md D1 (see
+# src/ada/src/services/sensor_manager/SUBTYPES.md).
+#
+# An empty GroundSampleDistances list takes the 1000.0 m/px default, far
+# above every achievable GSD, so all candidate deltas truncate to the same
+# integer in C++ (its abs resolves to the C integer abs) and the first
+# FOV candidate wins; Ada compares real-valued deltas and selects the
+# candidate genuinely closest to the default.
+xfail: true
+xfail_match: "HorizontalFOV"
+xfail_reason: >
+  C++ truncates GSD deltas to integers before comparing (C integer abs),
+  keeping the first FOV candidate; Ada selects the true closest GSD
+  (SUBTYPES.md D1).

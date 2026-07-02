@@ -31,7 +31,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             VideoStreamHorizontalResolution=1600,
             VideoStreamVerticalResolution=1200,  # Aspect ratio = 1600/1200 = 1.333...
             SupportedWavelengthBand=1,
-            FieldOfViewMode=1,
+            FieldOfViewMode=0,
             randomize=True
         )
 
@@ -51,7 +51,9 @@ with Server(bridge_cfg=bridge_cfg) as server:
             FootprintRequestID=1,
             VehicleID=400,
             EligibleWavelengths=[1],
-            GroundSampleDistances=[5.0],
+            GroundSampleDistances=[0.1],
+            AglAltitudes=[1000.0],
+            ElevationAngles=[-80.0],
             randomize=True
         )
 
@@ -99,7 +101,7 @@ with Server(bridge_cfg=bridge_cfg) as server:
             VideoStreamHorizontalResolution=1920,
             VideoStreamVerticalResolution=0,  # Zero - should default to aspect ratio 1.0
             SupportedWavelengthBand=1,
-            FieldOfViewMode=1,
+            FieldOfViewMode=0,
             randomize=True
         )
 
@@ -119,7 +121,9 @@ with Server(bridge_cfg=bridge_cfg) as server:
             FootprintRequestID=2,
             VehicleID=500,
             EligibleWavelengths=[1],
-            GroundSampleDistances=[5.0],
+            GroundSampleDistances=[0.1],
+            AglAltitudes=[1000.0],
+            ElevationAngles=[-80.0],
             randomize=True
         )
 

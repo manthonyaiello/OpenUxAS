@@ -1,0 +1,13 @@
+# Deliberate divergence exemplar for SUBTYPES.md D2 (see
+# src/ada/src/services/sensor_manager/SUBTYPES.md).
+#
+# The request pins ElevationAngles=[-45.0]. UXTASK.xml documents the field
+# as degrees, but C++ compares the raw degree value against the gimbal
+# limits in radians (-45 <= -1.396), so it evaluates at the gimbal minimum
+# (-80 deg). Ada converts to radians and evaluates at the requested -45 deg.
+xfail: true
+xfail_match: "GimbalElevation"
+xfail_reason: >
+  C++ compares the requested elevation (degrees) against radian gimbal
+  limits and evaluates at the gimbal minimum instead of the requested
+  angle; Ada converts units correctly (SUBTYPES.md D2).

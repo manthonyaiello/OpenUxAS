@@ -1,3 +1,4 @@
+import os
 import time
 from pylmcp import Object
 from pylmcp.server import Server
@@ -77,13 +78,21 @@ with Server(bridge_cfg=bridge_cfg) as server:
         assert msg.descriptor == "uxas.messages.task.SensorFootprintResponse"
         footprints = msg.obj['Footprints']
 
-        # The service creates one footprint object per parameter combination even when no
-        # valid sensor is found. With an invalid FOV mode, the service outputs an error
-        # (lines 298-301) and produces an empty FOV list, so GSD remains 0.0.
-        assert len(footprints) > 0, "Service should return footprint objects"
-        for fp in footprints:
-            assert fp['AchievedGSD'] == 0.0, \
-                f"AchievedGSD {fp['AchievedGSD']} should be 0.0 (no sensor found due to invalid FOV mode)"
+        if os.environ.get('UXAS_IMPL') == 'ada':
+            # Ada's LMCP deserialization rejects the invalid enum value with
+            # CONSTRAINT_ERROR before the entity configuration is stored, so
+            # the request finds no known vehicle and yields no footprints.
+            assert len(footprints) == 0, \
+                "Ada rejects the invalid FOV mode; no footprints expected"
+        else:
+            # The C++ service creates one footprint object per parameter
+            # combination even when no valid sensor is found. With an invalid
+            # FOV mode, the service outputs an error (lines 298-301) and
+            # produces an empty FOV list, so GSD remains 0.0.
+            assert len(footprints) > 0, "Service should return footprint objects"
+            for fp in footprints:
+                assert fp['AchievedGSD'] == 0.0, \
+                    f"AchievedGSD {fp['AchievedGSD']} should be 0.0 (no sensor found due to invalid FOV mode)"
 
         print("OK")
     finally:

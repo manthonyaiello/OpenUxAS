@@ -1,0 +1,14 @@
+# Deliberate divergence exemplar for SUBTYPES.md D9 (see
+# src/ada/src/services/sensor_manager/SUBTYPES.md).
+#
+# On re-receipt of an EntityConfiguration with a known ID, C++ uses
+# std::map::insert, which silently keeps the FIRST configuration; the Ada
+# service replaces it with the update. The second footprint request is
+# therefore answered from the original configuration by C++ (gimbal
+# minimum -80 deg, FOV from 10 deg) and from the updated configuration by
+# Ada (gimbal minimum -70 deg, FOV from 15 deg).
+xfail: true
+xfail_match: "GimbalElevation"
+xfail_reason: >
+  C++ std::map::insert keeps the first entity configuration; Ada honors
+  the update (SUBTYPES.md D9).

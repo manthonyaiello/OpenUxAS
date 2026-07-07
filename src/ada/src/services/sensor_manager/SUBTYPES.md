@@ -206,8 +206,11 @@ existing b2b tests pin them and they are not in scope of the mandated fixes:
 
 All Sensor Manager subprograms are proved to SPARK Silver (absence of
 runtime errors, plus the light functional contracts on the sweep and
-candidate math) at `--level=2`, resting on two kinds of deliberately
-unproved leaves:
+candidate math). The Silver scope reproves from a fresh clone at stock
+`--level=2` except for a single check that needs `--level=3` (verified
+2026-07); the campaign has historically also run with `--timeout=120`,
+which the Silver scope does not require. The proofs rest on two kinds
+of deliberately unproved leaves:
 
 - **Boundary functions** (`Is_Finite`, `Is_Below_Nominal_Threshold` in
   `Sensor_Manager_Types`): SPARK's floating-point model has no NaN or

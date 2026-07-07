@@ -2,19 +2,6 @@ with Sensor_Manager_Trig; use Sensor_Manager_Trig;
 
 package body Sensor_Manager_Types with SPARK_Mode is
 
-   --  Clamp a finite wire elevation into the documented CMASI range.
-   function Clamped_Elevation (Wire : Real32) return Elevation_Deg is
-     (Degrees_64'Min
-        (Degrees_64'Max (Degrees_64 (Wire), Elevation_Deg'First),
-         Elevation_Deg'Last))
-   with Pre => Is_Finite (Wire);
-
-   --  Clamp a radian elevation into the working range.
-   function Clamp_Working (R : Radians_64) return Working_Elevation_Rad is
-     (Radians_64'Min
-        (Radians_64'Max (R, Working_Elevation_Rad'First),
-         Working_Elevation_Rad'Last));
-
    ---------------
    -- Is_Finite --
    ---------------
@@ -179,6 +166,62 @@ package body Sensor_Manager_Types with SPARK_Mode is
       --  in the final step.
       return Radians_64'Min (Raw, Sweep.Hi);
    end Sweep_Elevation;
+
+   -------------------------------------
+   -- Lemma_Elevation_Of_Gimbal_Intro --
+   -------------------------------------
+
+   procedure Lemma_Elevation_Of_Gimbal_Intro
+     (Entity_Cfg   : EntityConfig;
+      Wire_Deg     : Real32;
+      Gimbal_Index : Positive;
+      Step         : Natural)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  introduction is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Elevation_Of_Gimbal);
+
+   ----------------------------------
+   -- Lemma_Camera_On_Gimbal_Intro --
+   ----------------------------------
+
+   procedure Lemma_Camera_On_Gimbal_Intro
+     (Entity_Cfg    : EntityConfig;
+      Gimbal_Index  : Positive;
+      List_Position : Positive;
+      Camera_Index  : Positive)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  introduction is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Camera_On_Gimbal);
+
+   --------------------------------------
+   -- Lemma_Valid_FOV_Continuous_Intro --
+   --------------------------------------
+
+   procedure Lemma_Valid_FOV_Continuous_Intro
+     (Camera : CameraConfig;
+      Index  : Natural)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  introduction is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Valid_FOV_Of);
+
+   ------------------------------------
+   -- Lemma_Valid_FOV_Discrete_Intro --
+   ------------------------------------
+
+   procedure Lemma_Valid_FOV_Discrete_Intro
+     (Camera : CameraConfig;
+      DI     : Positive)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  introduction is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Valid_FOV_Of);
 
    ---------------------------
    -- Continuous_Candidates --
@@ -382,5 +425,441 @@ package body Sensor_Manager_Types with SPARK_Mode is
       Axiom_Sin_Bounds_On_Half_Turn (Alpha);
       return Real64 (Slant) * Sin (Alpha);
    end Compute_GSD;
+
+   ---------------------------------
+   -- Lemma_Camera_Covered_Extend --
+   ---------------------------------
+
+   procedure Lemma_Camera_Covered_Extend
+     (Camera  : CameraConfig;
+      FI_Hi   : Positive;
+      Slant   : Slant_Range_M;
+      Desired : Desired_GSD_M;
+      Found   : Boolean;
+      Best    : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  extension is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Camera_Covered_Upto);
+
+   -----------------------------------
+   -- Lemma_Camera_Covered_Monotone --
+   -----------------------------------
+
+   procedure Lemma_Camera_Covered_Monotone
+     (Camera  : CameraConfig;
+      FI_Hi   : Natural;
+      Slant   : Slant_Range_M;
+      Desired : Desired_GSD_M;
+      Found0  : Boolean;
+      Best0   : Achieved_GSD_M;
+      Found1  : Boolean;
+      Best1   : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  monotonicity is proved (transitivity of Dominates, which is not
+   --  hidden).
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Camera_Covered_Upto);
+
+   ----------------------------------
+   -- Lemma_Position_Covered_Empty --
+   ----------------------------------
+
+   procedure Lemma_Position_Covered_Empty
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      Position            : Positive;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  trivial base case is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Position_Covered_Upto);
+
+   -----------------------------------
+   -- Lemma_Position_Covered_Extend --
+   -----------------------------------
+
+   procedure Lemma_Position_Covered_Extend
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      Position            : Positive;
+      CJ_Hi               : Positive;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  extension is proved. The camera-level predicate stays hidden: its
+   --  atoms transfer syntactically between hypothesis and conclusion.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Position_Covered_Upto);
+
+   -------------------------------------
+   -- Lemma_Position_Covered_Monotone --
+   -------------------------------------
+
+   procedure Lemma_Position_Covered_Monotone
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      Position            : Positive;
+      CJ_Hi               : Natural;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found0              : Boolean;
+      Best0               : Achieved_GSD_M;
+      Found1              : Boolean;
+      Best1               : Achieved_GSD_M)
+   is
+      --  The predicate is hidden by default; disclose it here, where its
+      --  monotonicity is proved. The camera-level predicate stays
+      --  hidden: the loop rewrites it pointwise via its own
+      --  monotonicity lemma.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Position_Covered_Upto);
+   begin
+      for CJ in 1 .. CJ_Hi loop
+         if Get (Entity_Cfg.Cameras, CJ).PayloadID
+              = Get (Get (Entity_Cfg.Gimbals, Gimbal_Index)
+                       .ContainedPayloadList,
+                     Position)
+           and then Wavelength_Eligible
+                      (Get (Entity_Cfg.Cameras, CJ), Eligible_Wavelength)
+         then
+            Lemma_Camera_Covered_Monotone
+              (Get (Entity_Cfg.Cameras, CJ),
+               FOV_Candidate_Bound (Get (Entity_Cfg.Cameras, CJ)),
+               Slant, Desired, Found0, Best0, Found1, Best1);
+         end if;
+         pragma Loop_Invariant
+           (Position_Covered_Upto
+              (Entity_Cfg, Eligible_Wavelength, Gimbal_Index, Position,
+               CJ, Slant, Desired, Found1, Best1));
+      end loop;
+   end Lemma_Position_Covered_Monotone;
+
+   -----------------------------------
+   -- Lemma_Positions_Covered_Empty --
+   -----------------------------------
+
+   procedure Lemma_Positions_Covered_Empty
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  trivial base case is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Positions_Covered_Upto);
+
+   ------------------------------------
+   -- Lemma_Positions_Covered_Extend --
+   ------------------------------------
+
+   procedure Lemma_Positions_Covered_Extend
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      P_Hi                : Positive;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  extension is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Positions_Covered_Upto);
+
+   --------------------------------------
+   -- Lemma_Positions_Covered_Monotone --
+   --------------------------------------
+
+   procedure Lemma_Positions_Covered_Monotone
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Gimbal_Index        : Positive;
+      P_Hi                : Natural;
+      Slant               : Slant_Range_M;
+      Desired             : Desired_GSD_M;
+      Found0              : Boolean;
+      Best0               : Achieved_GSD_M;
+      Found1              : Boolean;
+      Best1               : Achieved_GSD_M)
+   is
+      --  The predicate is hidden by default; disclose it here, where its
+      --  monotonicity is proved; the loop rewrites the position-level
+      --  predicate pointwise via its own monotonicity lemma.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Positions_Covered_Upto);
+   begin
+      for P in 1 .. P_Hi loop
+         Lemma_Position_Covered_Monotone
+           (Entity_Cfg, Eligible_Wavelength, Gimbal_Index, P,
+            Last (Entity_Cfg.Cameras), Slant, Desired,
+            Found0, Best0, Found1, Best1);
+         pragma Loop_Invariant
+           (Positions_Covered_Upto
+              (Entity_Cfg, Eligible_Wavelength, Gimbal_Index, P, Slant,
+               Desired, Found1, Best1));
+      end loop;
+   end Lemma_Positions_Covered_Monotone;
+
+   -------------------------------
+   -- Lemma_Steps_Covered_Empty --
+   -------------------------------
+
+   procedure Lemma_Steps_Covered_Empty
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Gimbal_Index        : Positive;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  trivial base case is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Steps_Covered_Upto);
+
+   --------------------------------
+   -- Lemma_Steps_Covered_Extend --
+   --------------------------------
+
+   procedure Lemma_Steps_Covered_Extend
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Gimbal_Index        : Positive;
+      S_Hi                : Positive;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  extension is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Steps_Covered_Upto);
+
+   ----------------------------------
+   -- Lemma_Steps_Covered_Monotone --
+   ----------------------------------
+
+   procedure Lemma_Steps_Covered_Monotone
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Gimbal_Index        : Positive;
+      S_Hi                : Natural;
+      Desired             : Desired_GSD_M;
+      Found0              : Boolean;
+      Best0               : Achieved_GSD_M;
+      Found1              : Boolean;
+      Best1               : Achieved_GSD_M)
+   is
+      --  The predicate is hidden by default; disclose it here, where its
+      --  monotonicity is proved; the loop rewrites the positions-level
+      --  predicate pointwise via its own monotonicity lemma.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Steps_Covered_Upto);
+   begin
+      for S in 0 .. S_Hi - 1 loop
+         Lemma_Positions_Covered_Monotone
+           (Entity_Cfg, Eligible_Wavelength, Gimbal_Index,
+            Last (Get (Entity_Cfg.Gimbals, Gimbal_Index)
+                    .ContainedPayloadList),
+            Slant_Range
+              (Altitude,
+               Sweep_Elevation
+                 (Sweep_Of (Get (Entity_Cfg.Gimbals, Gimbal_Index),
+                            Elev_Wire),
+                  S)),
+            Desired, Found0, Best0, Found1, Best1);
+         pragma Loop_Invariant
+           (Steps_Covered_Upto
+              (Entity_Cfg, Eligible_Wavelength, Elev_Wire, Altitude,
+               Gimbal_Index, S + 1, Desired, Found1, Best1));
+      end loop;
+   end Lemma_Steps_Covered_Monotone;
+
+   --------------------------------
+   -- Lemma_Gimbal_Covered_Intro --
+   --------------------------------
+
+   procedure Lemma_Gimbal_Covered_Intro
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Gimbal_Index        : Positive;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  introduction is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Gimbal_Covered);
+
+   -----------------------------------
+   -- Lemma_Gimbal_Covered_Monotone --
+   -----------------------------------
+
+   procedure Lemma_Gimbal_Covered_Monotone
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Gimbal_Index        : Positive;
+      Desired             : Desired_GSD_M;
+      Found0              : Boolean;
+      Best0               : Achieved_GSD_M;
+      Found1              : Boolean;
+      Best1               : Achieved_GSD_M)
+   is
+      --  The predicate is hidden by default; disclose it here, where its
+      --  monotonicity is proved; a valid sweep is rewritten via the
+      --  steps-level monotonicity lemma, an invalid one is vacuous.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Gimbal_Covered);
+   begin
+      if Sweep_Of (Get (Entity_Cfg.Gimbals, Gimbal_Index),
+                   Elev_Wire).Valid
+      then
+         Lemma_Steps_Covered_Monotone
+           (Entity_Cfg, Eligible_Wavelength, Elev_Wire, Altitude,
+            Gimbal_Index,
+            Sweep_Step_Count
+              (Sweep_Of (Get (Entity_Cfg.Gimbals, Gimbal_Index),
+                         Elev_Wire)),
+            Desired, Found0, Best0, Found1, Best1);
+      end if;
+   end Lemma_Gimbal_Covered_Monotone;
+
+   ---------------------------------
+   -- Lemma_Gimbals_Covered_Empty --
+   ---------------------------------
+
+   procedure Lemma_Gimbals_Covered_Empty
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  trivial base case is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Gimbals_Covered_Upto);
+
+   ----------------------------------
+   -- Lemma_Gimbals_Covered_Extend --
+   ----------------------------------
+
+   procedure Lemma_Gimbals_Covered_Extend
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      K_Hi                : Positive;
+      Desired             : Desired_GSD_M;
+      Found               : Boolean;
+      Best                : Achieved_GSD_M)
+   is null;
+   --  The predicate is hidden by default; disclose it here, where its
+   --  extension is proved.
+   pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                    Gimbals_Covered_Upto);
+
+   ------------------------------------
+   -- Lemma_Gimbals_Covered_Monotone --
+   ------------------------------------
+
+   procedure Lemma_Gimbals_Covered_Monotone
+     (Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Elev_Wire           : Real32;
+      Altitude            : Assigned_Altitude_M;
+      K_Hi                : Natural;
+      Desired             : Desired_GSD_M;
+      Found0              : Boolean;
+      Best0               : Achieved_GSD_M;
+      Found1              : Boolean;
+      Best1               : Achieved_GSD_M)
+   is
+      --  The predicate is hidden by default; disclose it here, where its
+      --  monotonicity is proved; the loop rewrites the gimbal-level
+      --  predicate pointwise via its own monotonicity lemma.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Gimbals_Covered_Upto);
+   begin
+      for K in 1 .. K_Hi loop
+         Lemma_Gimbal_Covered_Monotone
+           (Entity_Cfg, Eligible_Wavelength, Elev_Wire, Altitude, K,
+            Desired, Found0, Best0, Found1, Best1);
+         pragma Loop_Invariant
+           (Gimbals_Covered_Upto
+              (Entity_Cfg, Eligible_Wavelength, Elev_Wire, Altitude, K,
+               Desired, Found1, Best1));
+      end loop;
+   end Lemma_Gimbals_Covered_Monotone;
+
+   ---------------------------------------
+   -- Lemma_Footprint_GSD_Optimal_Intro --
+   ---------------------------------------
+
+   procedure Lemma_Footprint_GSD_Optimal_Intro
+     (FP                  : SensorFootprint_Msg;
+      Entity_Cfg          : EntityConfig;
+      Eligible_Wavelength : WavelengthBandEnum;
+      Desired             : Desired_GSD_M;
+      Altitude            : Assigned_Altitude_M;
+      Elev_Wire           : Real32;
+      Gimbal_Index        : Positive;
+      Step                : Natural;
+      Camera_Index        : Positive;
+      FOV_Index           : Positive;
+      Best                : Achieved_GSD_M)
+   is
+      --  The optimality predicate is hidden by default; disclose it
+      --  here, where its introduction is proved. Selection_Witness is
+      --  disclosed too: it holds the equality between Best and the
+      --  witnessing tuple's own GSD, which licenses rewriting the
+      --  coverage atom from Best to Candidate_GSD terms via the
+      --  monotonicity lemma below (equal GSDs dominate each other).
+      --  Is_Candidate and the coverage predicates stay hidden: their
+      --  atoms transfer syntactically from the precondition and the
+      --  lemma call.
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Footprint_GSD_Optimal);
+      pragma Annotate (GNATprove, Unhide_Info, "Expression_Function_Body",
+                       Selection_Witness);
+   begin
+      Lemma_Gimbals_Covered_Monotone
+        (Entity_Cfg, Eligible_Wavelength, Elev_Wire, Altitude,
+         Last (Entity_Cfg.Gimbals), Desired, True, Best, True,
+         Candidate_GSD
+           (Entity_Cfg, Altitude, Elev_Wire, Gimbal_Index, Step,
+            Camera_Index, FOV_Index));
+   end Lemma_Footprint_GSD_Optimal_Intro;
 
 end Sensor_Manager_Types;
